@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Scan Monitor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+        }
+
+        .centered {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 10px;
+        }
+
+        input,
+        select,
+        button {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            width: 300px;
+        }
+
+        button {
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+        }
+
+        .layout {
+            display: none;
+            flex-direction: row;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .left {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .barcode-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            color: #ffd700;
+            word-break: break-word;
+        }
+
+        .details-box {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            white-space: pre-wrap;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            min-height: 300px;
+        }
+
+        .status-approved {
+            background-color: #228B22 !important;
+            color: #fff;
+        }
+
+        .status-rejected {
+            background-color: #8B0000 !important;
+            color: #fff;
+        }
+
+        .right {
+            flex: 1;
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .right h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .history-item {
+            background-color: #3c3c3c;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+
+        .recent-scan {
+            background-color: #ffd700 !important;
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="centered" id="setup">
+        <h2>Masukkan Session ID</h2>
+        <input type="text" id="sessionInput" placeholder="Contoh: session123">
+        <button onclick="loadMuatList()">Lanjut</button>
+
+        <div id="muatSelection"
+            style="display:none; flex-direction: column; align-items: center; gap: 10px; margin-top: 20px;">
+            <h3>Pilih Muat:</h3>
+            <select id="muatDropdown"></select>
+            <button onclick="startMonitoring()">Mulai Scan</button>
+        </div>
+    </div>
+
+    <div class="layout" id="scanner">
+        <div class="left">
+            <div id="barcodeString" class="barcode-display">Silakan scan barcode...</div>
+            <div id="scanDetails" class="details-box">Menunggu data dari server...</div>
+        </div>
+        <div class="right">
+            <h3>Riwayat Scan</h3>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = "";
+        let muatId = "";
+        let buffer = "";
+        let lastKeyTime = Date.now();
+        let barcodeString = "";
+        let ws;
+
+        async function loadMuatList() {
+            sessionId = document.getElementById('sessionInput').value.trim();
+            if (!sessionId) return alert("Session ID wajib diisi.");
+
+            const res = await fetch("/muat-list");
+            const data = await res.json();
+
+            const dropdown = document.getElementById("muatDropdown");
+            dropdown.innerHTML = "";
+            data.forEach(m => {
+                const option = document.createElement("option");
+                option.value = m.id;
+                option.textContent = `${m.nopol} - ${m.driver} - ${m.tujuan}`;
+                dropdown.appendChild(option);
+            });
+
+            document.getElementById("muatSelection").style.display = "flex";
+        }
+
+        function startMonitoring() {
+            muatId = document.getElementById("muatDropdown").value;
+            if (!muatId) return alert("Muat harus dipilih.");
+
+            document.getElementById("setup").style.display = "none";
+            document.getElementById("scanner").style.display = "flex";
+
+            connectWebSocket();
+        }
+
+        function connectWebSocket() {
+            const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/${sessionId}`);
+
+            ws.onmessage = (event) => {
+                const response = JSON.parse(event.data);
+                const data = response.data || {};
+                const detailsBox = document.getElementById("scanDetails");
+
+                detailsBox.classList.remove("status-approved", "status-rejected");
+                if (data.status_scan === "approved") detailsBox.classList.add("status-approved");
+                else if (data.status_scan === "rejected") detailsBox.classList.add("status-rejected");
+
+                document.getElementById("barcodeString").textContent = barcodeString;
+
+                document.getElementById("scanDetails").textContent = `
+📦 Status: ${data.status_scan?.toUpperCase() || "UNKNOWN"}
+📝 Deskripsi: ${data.status_desc || ""}
+🔢 Barcode: ${data.barcode || ""}
+📦 Kemasan: ${data.no_kemasan || ""}
+📄 SPPB: ${data.no_sppb || ""} (${data.tgl_sppb || ""})
+🔍 Hasil Periksa: ${data.hasil_periksa || ""}
+🚪 Gate In: ${data.waktu_gate_in || "-"}
+🚪 Gate Out: ${data.waktu_gate_out || "-"}
+📍 Provinsi: ${data.provinsi_penerima || ""}
+🏢 Agen: ${data.kode_agen || ""}`.trim();
+
+                const historyList = document.getElementById("historyList");
+                const prevRecent = historyList.querySelector(".recent-scan");
+                if (prevRecent) prevRecent.classList.remove("recent-scan");
+                const historyItem = document.createElement("div");
+                historyItem.className = "history-item recent-scan";
+                historyItem.textContent = barcodeString;
+                historyList.prepend(historyItem);
+
+                speakIndonesian(data.status_scan === "approved" ? "Disetujui" : `Ditolak. ${data.status_desc || ""}`);
+            };
+        }
+
+        document.addEventListener("keydown", function (e) {
+            const now = Date.now();
+            if (now - lastKeyTime > 100) buffer = "";
+            lastKeyTime = now;
+
+            if (e.key === "Enter") {
+                if (buffer) {
+                    buffer = buffer.replace(/Shift/g, "");
+                    sendScan(buffer);
+                    buffer = "";
+                }
+            } else {
+                buffer += e.key;
+            }
+        });
+
+        function sendScan(barcode) {
+            if (!sessionId || !muatId) return;
+            fetch("/scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId, muat_id: muatId, barcode })
+            });
+            barcodeString = barcode;
+        }
+
+        function speakIndonesian(text) {
+            const msg = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices();
+            msg.lang = "id-ID";
+            const indoVoice = voices.find(v => v.lang === "id-ID");
+            if (indoVoice) msg.voice = indoVoice;
+            speechSynthesis.speak(msg);
+        }
+
+        window.speechSynthesis.onvoiceschanged = () => {
+            speakIndonesian("Siap menerima scan");
+        };
+    </script>
+</body>
+
+</html>

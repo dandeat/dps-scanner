@@ -1,0 +1,155 @@
+package constants
+
+const (
+	EMPTY_VALUE     = ""
+	NULL_LONG_VALUE = -99
+	YES             = "Y"
+	NO              = "N"
+	TRUE_VALUE      = true
+	FALSE_VALUE     = false
+	EMPTY_VALUE_INT = 0
+
+	REQ_JSON        = "json"
+	REQ_URL_ENCODED = "urlencoded"
+	REQ_FORM_DATA   = "formdata"
+
+	MKP              = "MKP"
+	ACTIVE           = "ACTIVE"
+	ACTIVE_DESC      = "Aktif"
+	BLOCKED_PIN      = "BLOCKED_PIN"
+	BLOCKED_PIN_DESC = "Autentikasi gagal, akun diblokir"
+	BLOCKED          = "BLOCKED"
+	BLOCKED_DESC     = "Diblokir"
+	UNVERIFIED       = "UNVERIFIED"
+	UNVERIFIED_DESC  = "Belum verifikasi"
+	INACTIVE_DESC    = "Tidak Aktif"
+
+	INACTIVE    = "INACTIVE"
+	AVAILABLE   = "AVAILABLE"
+	UNAVAILABLE = "UNAVAILABLE"
+	CONFIRMED   = "CONFIRMED"
+	YES_VALUE   = "Y"
+	NO_VALUE    = "N"
+	ONE_VALUE   = 1
+	TWO_VALUE   = 2
+	SIX_VALUE   = 6
+
+	HTTP_METHOD_POST = "POST"
+	HTTP_METHOD_GET  = "GET"
+
+	CONTENT_TYPE_JSON = "application/json"
+
+	TRX_INQUIRY_SUCCESS_CODE = "01"
+	TRX_INQUIRY_FAILED_CODE  = "99"
+	TRX_SUCCESS_CODE         = "00"
+	TRX_PENDING_CODE         = "02"
+	TRX_FAILED_CODE          = "03"
+
+	LAYOUT_TIMESTAMP        = "2006-01-02 15:04:05"
+	LAYOUT_HOUR             = "15:04"
+	LAYOUT_DATE             = "2006-01-02"
+	LAYOUT_TIMESTAMP_GOLANG = "2006-01-02T15:04:05Z"
+
+	TRX_INQUIRY_SUCCESS_MESSAGE = "INQUIRY_SUCCESS"
+	TRX_INQUIRY_FAILED_MESSAGE  = "INQUIRY_FAILED"
+	TRX_SUCCESS_MESSAGE         = "TRX_SUCCESS"
+	TRX_PENDING_MESSAGE         = "TRX_PENDING"
+	TRX_FAILED_MESSAGE          = "TRX_FAILED"
+	TRX_CANCEL_MESSAGE          = "TRX_CANCEL"
+	TRX_REFUND_MESSAGE          = "TRX_REFUND"
+
+	DAYS_NAMES = "MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY"
+	SYSTEM     = "system"
+	USER       = "user"
+
+	DEBIT  = "DEBIT"
+	CREDIT = "CREDIT"
+
+	OTP_EMAIL             = "OTP EMAIL"
+	LINKED_STATUS_INQUIRY = "INQUIRY OTP"
+	UNLINKED              = "UNLINKED"
+
+	// ACCOUNT TYPE
+	ACCOUNT_SAVING      = "SAVING"
+	ACCOUNT_SAVING_CODE = "008"
+
+	// ACCOUNT LEVEL
+	ACCOUNT_BASIC   = "BASIC"
+	ACCOUNT_PREMIUM = "PREMIUM"
+
+	// TRX TYPE CODE FOR DEBIT
+	TRX_PAYMENT_CODE                  = "101" // Pembayaran
+	TRX_TRANSFER_DEBIT_CODE           = "102" // Transfer DANA Debit
+	TRX_CASH_WITHDRAWAL_CODE          = "103" // Tarik Tunai
+	TRX_ADMIN_FEE_CODE                = "104" // Biaya Admin
+	TRX_TAX_CODE                      = "105" // Pajak
+	TRX_DEPOSIT_WITHDRAWAL_DEBIT_CODE = "106" // Penarikan Dana Deposit
+
+	// TRX TYPE MESSAGE FOR DEBIT
+	TRX_PAYMENT_MSG            = "Pembayaran"
+	TRX_TRANSFER_DEBIT_MSG     = "Transfer Dana"
+	TRX_CASH_WITHDRAWAL_MSG    = "Tarik Tunai"
+	TRX_ADMIN_FEE_MSG          = "Biaya Admin"
+	TRX_TAX_MSG                = "Pajak"
+	TRX_DEPOSIT_WITHDRAWAL_MSG = "Penarikan Dana Deposit"
+
+	// TRX TYPE CODE FOR CREDIT
+	TRX_REFUND_CODE                    = "001" // REFUND
+	TRX_INTEREST_CODE                  = "002" // BUNGA
+	TRX_CASH_DEPOSIT_CODE              = "003" // SETOR TUNAI
+	TRX_TRANSFER_CREDIT_CODE           = "004" // TRANSFER DANA
+	TRX_REVERSAL_CREDIT_CODE           = "005" // REVERSAL
+	TRX_DEPOSIT_CODE                   = "006" // DEPOSIT
+	TRX_DEPOSIT_WITHDRAWAL_CREDIT_CODE = "007" // Penarikan Dana Deposit
+
+	// TRX TYPE MSG FOR CREDIT
+	TRX_REFUND_MSG          = "Refund"
+	TRX_INTEREST_MSG        = "Bunga"
+	TRX_CASH_DEPOSIT_MSG    = "Setor Tunai"
+	TRX_TRANSFER_CREDIT_MSG = "Transfer Dana"
+	TRX_REVERSAL_CREDIT_MSG = "Reversal"
+	TRX_DEPOSIT_CODE_MSG    = "Deposit"
+
+	// REMARKS
+	FROM = "Dari"
+
+	// LINKED METHOD
+	SMS      = "SMS"
+	EMAIL    = "EMAIL"
+	WHATSAPP = "WHATSAPP"
+	PARTNER  = "PARTNER"
+
+	// DEBIT CREDIT OPERATOR
+	OPERATOR_DEBIT  = "-"
+	OPERATOR_CREDIT = "+"
+
+	// GENDER
+	MALE   = "M"
+	FEMALE = "F"
+
+	// PARTNER
+	PARTNER_ID_DS               = 1
+	PARTNER_CODE_DIGITAL_SAVING = "DS"
+
+	// COMPRESS LEVEL
+	LEVEL_ZERO  = "0"
+	LEVEL_ONE   = "1"
+	LEVEL_TWO   = "2"
+	LEVEL_THREE = "3"
+)
+
+var (
+	CATEGORY_COMPRESS_LEVEL = []string{
+		LEVEL_ZERO,
+		LEVEL_ONE,
+		LEVEL_TWO,
+		LEVEL_THREE,
+	}
+)
+
+var (
+	LINKED_METHOD_POOL = []string{
+		EMAIL,
+		PARTNER,
+	}
+)

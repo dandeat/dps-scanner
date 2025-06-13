@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Barcode Scanner Display</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      font-family: Arial, sans-serif;
+      transition: background-color 0.5s ease;
+    }
+
+    .left-panel {
+      width: 70%;
+      padding: 20px;
+      color: white;
+    }
+
+    .barcode-display {
+      font-size: 36px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .details {
+      font-size: 18px;
+      line-height: 1.6;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+    }
+
+    .right-panel {
+      width: 30%;
+      padding: 20px;
+      background-color: #222;
+      color: #fff;
+      overflow-y: auto;
+      border-left: 2px solid #444;
+    }
+
+    .history {
+      font-size: 14px;
+    }
+
+    .history-item {
+      margin-bottom: 10px;
+      border-bottom: 1px solid #555;
+      padding-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="left-panel">
+    <div class="barcode-display" id="barcodeScanned">Menunggu scan...</div>
+    <div class="details" id="scanDetails">Data akan ditampilkan di sini setelah scan.</div>
+  </div>
+  <div class="right-panel">
+    <h3>Riwayat Scan</h3>
+    <div class="history" id="scanHistory"></div>
+  </div>
+  
+    <script>
+        let ws;
+        let sessionId = "";
+        let buffer = "";
+        let lastKeyTime = Date.now();
+        let barcodeString = "";
+
+        function connectWS() {
+            sessionId = document.getElementById("sessionId").value.trim();
+            if (!sessionId) return alert("Session ID required");
+
+            ws = new WebSocket(`ws://localhost:8080/ws/${sessionId}`);
+            ws.onopen = () => {
+                console.log("Connected to session", sessionId);
+                document.getElementById("sessionConnect").style.display = "none";
+            };
+
+            ws.onmessage = (msg) => {
+                const res = JSON.parse(msg.data);
+                const data = res.data;
+
+                // Set screen color
+                if (data.status_scan === "approved") {
+                    document.body.className = "approved";
+                } else if (data.status_scan === "rejected") {
+                    document.body.className = "rejected";
+                } else {
+                    document.body.className = "neutral";
+                }
+
+                // ✅ Display scanned barcode
+                document.getElementById("scannedBarcode").textContent = barcodeString || "-";
+
+                // Fill status and data
+                document.getElementById("statusScan").textContent = data.status_scan.toUpperCase();
+                document.getElementById("statusDesc").textContent = data.status_desc;
+
+                document.getElementById("dataFields").innerHTML = `
+                    <p><span class="label">No Kemasan:</span> ${data.no_kemasan || '-'}</p>
+                    <p><span class="label">No SPPB:</span> ${data.no_sppb || '-'}</p>
+                    <p><span class="label">Tgl SPPB:</span> ${data.tgl_sppb || '-'}</p>
+                    <p><span class="label">Hasil Periksa:</span> ${data.hasil_periksa || '-'}</p>
+                    <p><span class="label">Waktu Gate In:</span> ${data.waktu_gate_in || '-'}</p>
+                    <p><span class="label">Waktu Gate Out:</span> ${data.waktu_gate_out || '-'}</p>
+                    <p><span class="label">Provinsi Penerima:</span> ${data.provinsi_penerima || '-'}</p>
+                    <p><span class="label">Kode Agen:</span> ${data.kode_agen || '-'}</p>
+                `;
+
+                // ✅ Voice feedback
+                const voices = speechSynthesis.getVoices();
+                const indoVoice = voices.find(v => v.lang === "id-ID");
+
+                const utter = new SpeechSynthesisUtterance();
+                utter.text = data.status_scan === "approved" ? "Disetujui" : "Ditolak" +
+                    (data.status_desc ? `, ${data.status_desc}` : "");
+                utter.lang = "id-ID";
+                utter.voice = indoVoice || null; // fallback just in case
+                utter.volume = 1;
+                utter.rate = 1;
+                utter.pitch = 1;
+
+                window.speechSynthesis.speak(utter);
+            };
+
+        }
+
+        function sendScan(barcode) {
+            if (!sessionId) return;
+            fetch("http://localhost:8080/scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId, barcode })
+            });
+            barcodeString = barcode;
+        }
+
+        // Barcode detection from scanner (keyboard mode)
+        document.addEventListener("keydown", function (e) {
+            const now = Date.now();
+            if (now - lastKeyTime > 100) buffer = "";
+            lastKeyTime = now;
+
+            if (e.key === "Enter") {
+                if (buffer) {
+                    // trim from "Shift"
+                    buffer = buffer.replace(/Shift/g, "");
+                    sendScan(buffer);
+                    buffer = "";
+                }
+            } else {
+                buffer += e.key;
+            }
+        });
+    </script>
+</body>
+
+</html>

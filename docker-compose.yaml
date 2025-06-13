@@ -1,0 +1,22 @@
+version: '3'
+services:
+  dps-scanner:
+    image: ${REGISTRY_URL}/${APP_NAME}:${APP_VERSION}
+    build: "./"
+    container_name: dps-scanner-${APP_VERSION}
+    restart: unless-stopped
+    tty: true
+    environment:
+      TZ: "Asia/Jakarta"
+
+    ports:
+      - "10122:8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1000m"
+    networks:
+      - sample-service-network
+networks:
+  sample-service-network:
+    driver: bridge

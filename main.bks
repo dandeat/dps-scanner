@@ -1,0 +1,124 @@
+package main
+
+import (
+	"context"
+	"dps-scanner-gateout/app"
+	"dps-scanner-gateout/constants"
+	"dps-scanner-gateout/routes"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+
+	mkpmobileutils "github.com/dandeat/mkpmobile-utils/src/utils"
+	"github.com/go-playground/locales/id"
+	ut "github.com/go-playground/universal-translator"
+	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
+	"gopkg.in/go-playground/validator.v9"
+	id_translations "gopkg.in/go-playground/validator.v9/translations/id"
+)
+
+// CustomValidator adalah
+type CustomValidator struct {
+	validator  *validator.Validate
+	translator ut.Translator
+}
+
+// Passing Variable
+var (
+	uni         *ut.UniversalTranslator
+	echoHandler echo.Echo
+	ctx         = context.Background()
+)
+
+// Custom Validator and translation
+func (cv *CustomValidator) Validate(i interface{}) error {
+	err := cv.validator.Struct(i)
+	if err != nil {
+		errs := err.(validator.ValidationErrors)
+		for _, row := range errs {
+			return errors.New(row.Translate(cv.translator))
+		}
+	}
+
+	return cv.validator.Struct(i)
+}
+
+func main() {
+	// Configuration Repository and Services
+	//Connect Mongo
+	// mongoDB := config.ConnectMongo(ctx)
+	// defer config.CloseMongo(ctx)
+
+	// repoRunNumb := runningNumberRepository.NewRepository(ctx, mongoDB)
+
+	services := app.SetupApp()
+
+	// Generate Access Token Scheduler
+
+	go routes.RoutesApi(&echoHandler, services)
+	port := fmt.Sprintf(":%s", "8080")
+	echoHandler.Logger.Fatal(echoHandler.Start(port))
+}
+
+// func schedulerAccessTokenSPay() {
+// 	helpers.GenAccessToken()
+// 	for range time.Tick(time.Second * time.Duration(config.SPAY_ACCESSTOKEN_SCHEDULAR_INTERVAL)) {
+// 		helpers.GenAccessToken()
+// 	}
+// }
+
+func init() {
+	// utils.InitLogger()
+	boardingService()
+
+	e := echo.New()
+	echoHandler = *e
+	validateCustom := validator.New()
+
+	id := id.New()
+	uni = ut.New(id, id)
+	trans, _ := uni.GetTranslator("id")
+	id_translations.RegisterDefaultTranslations(validateCustom, trans)
+	e.Validator = &CustomValidator{validator: validateCustom, translator: trans}
+
+	//LOG FILE
+	// f, err := os.OpenFile("logs/log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	// if err != nil {
+	// 	panic(fmt.Sprintf("error opening file: %v", err))
+	// }
+	// defer f.Close()
+
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format: `{"time":"${time_rfc3339_nano}","id":"${id}","remote_ip":"${remote_ip}",` +
+			`"host":"${host}","method":"${method}","uri":"${uri}","user_agent":"${user_agent}",` +
+			`"status":${status},"error":"${error}","latency":${latency},"latency_human":"${latency_human}"` +
+			`,"bytes_in":${bytes_in},"bytes_out":${bytes_out}}` + "\n",
+		CustomTimeFormat: "2006-01-02 15:04:05.00000",
+	}))
+	// e.Logger.SetOutput(f)
+	e.Use(middleware.Recover())
+	e.Use(middleware.Secure())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowCredentials: constants.TRUE_VALUE,
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
+	}))
+
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		report, ok := err.(*echo.HTTPError)
+		if !ok {
+			report = echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		result := mkpmobileutils.ResponseJSONV1(strconv.Itoa(report.Code), fmt.Sprintf("%v", report.Message), nil)
+		c.Logger().Error(report)
+		c.JSON(report.Code, result)
+	}
+}
+
+func boardingService() {
+	fmt.Println(`
+	
+ `)
+}

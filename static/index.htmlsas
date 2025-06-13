@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Scan Monitor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+        }
+
+        .layout {
+            display: flex;
+            height: 100vh;
+            flex-direction: row;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .left {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 20px;
+        }
+
+        .barcode-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            color: #ffd700;
+            word-break: break-all;
+        }
+
+        .details-box {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            white-space: pre-wrap;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            min-height: 300px;
+            color: #d0d0d0;
+        }
+
+        .status-approved {
+            background-color: #228B22 !important;
+            color: #fff;
+        }
+
+        .status-rejected {
+            background-color: #8B0000 !important;
+            color: #fff;
+        }
+
+        .right {
+            flex: 1;
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .right h3 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .history-item {
+            background-color: #3c3c3c;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            word-break: break-all;
+        }
+
+        @media (max-width: 768px) {
+            .layout {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .left,
+            .right {
+                width: 100%;
+            }
+        }
+
+        .recent-scan {
+            background-color: #ffd700 !important;
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <div class="left">
+            <div id="barcodeString" class="barcode-display">Silakan scan barcode...</div>
+            <div id="scanDetails" class="details-box">Menunggu data dari server...</div>
+        </div>
+        <div class="right">
+            <h3>Riwayat Scan</h3>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = "";
+        let buffer = "";
+        let lastKeyTime = Date.now();
+        let barcodeString = "";
+
+        // Prompt for session ID
+        sessionId = prompt("Masukkan Session ID:");
+        if (!sessionId) {
+            alert("Session ID wajib diisi.");
+            throw new Error("Session ID is required.");
+        }
+        speakIndonesian("Siap menerima scan");
+
+        const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const ws = new WebSocket(wsProtocol + "//" + window.location.host + "/ws/" + sessionId);
+
+        ws.onmessage = function (event) {
+            const response = JSON.parse(event.data);
+            const data = response.data || {};
+            const detailsBox = document.getElementById("scanDetails");
+
+            // Set background color & status class
+            detailsBox.classList.remove("status-approved", "status-rejected");
+            if (data.status_scan === "approved") {
+                detailsBox.classList.add("status-approved");
+            } else if (data.status_scan === "rejected") {
+                detailsBox.classList.add("status-rejected");
+            }
+
+            // Set barcode display
+            document.getElementById("barcodeString").textContent = barcodeString;
+
+            // Set details display
+            const details = `
+📦 Status: ${data.status_scan?.toUpperCase() || "UNKNOWN"}
+📝 Deskripsi: ${data.status_desc || ""}
+🔢 Barcode: ${data.barcode || ""}
+📦 Kemasan: ${data.no_kemasan || ""}
+📄 SPPB: ${data.no_sppb || ""} (${data.tgl_sppb || ""})
+🔍 Hasil Periksa: ${data.hasil_periksa || ""}
+🚪 Gate In: ${data.waktu_gate_in || "-"}
+🚪 Gate Out: ${data.waktu_gate_out || "-"}
+📍 Provinsi: ${data.provinsi_penerima || ""}
+🏢 Agen: ${data.kode_agen || ""}
+            `.trim();
+            detailsBox.textContent = details;
+
+            // Add to history and highlight recent
+            const historyList = document.getElementById("historyList");
+
+            // Remove previous highlight
+            const prevRecent = historyList.querySelector(".recent-scan");
+            if (prevRecent) prevRecent.classList.remove("recent-scan");
+
+            // Create new item
+            const historyItem = document.createElement("div");
+            historyItem.className = "history-item recent-scan";
+            historyItem.textContent = barcodeString;
+            historyList.prepend(historyItem);
+
+
+            // Voice
+            const voiceText = data.status_scan === "approved" ? "Disetujui" : "Ditolak, " +
+                (data.status_desc || "Tidak ada keterangan");
+            speakIndonesian(voiceText);
+        };
+
+        // Keyboard-based scanner detection
+        document.addEventListener("keydown", function (e) {
+            const now = Date.now();
+            if (now - lastKeyTime > 100) buffer = "";
+            lastKeyTime = now;
+
+            if (e.key === "Enter") {
+                if (buffer) {
+                    buffer = buffer.replace(/Shift/g, "");
+                    sendScan(buffer);
+                    buffer = "";
+                }
+            } else {
+                buffer += e.key;
+            }
+        });
+
+        function sendScan(barcode) {
+            if (!sessionId) return;
+            fetch(window.location.protocol + "//" + window.location.host + "/scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    barcode: barcode,
+                })
+            });
+            barcodeString = barcode;
+        }
+
+        function speakIndonesian(text) {
+            const msg = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices();
+            msg.lang = "id-ID";
+            const indoVoice = voices.find(v => v.lang === "id-ID");
+            if (indoVoice) msg.voice = indoVoice;
+            speechSynthesis.speak(msg);
+        }
+
+        // Load voices on first load
+        window.speechSynthesis.onvoiceschanged = () => {
+            speakIndonesian("Siap menerima scan");
+        };
+    </script>
+</body>
+
+</html>
