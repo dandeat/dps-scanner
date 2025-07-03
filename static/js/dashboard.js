@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         
         saveLayout(); // Save the new widget immediately
-        // refreshWidgetData(id);
+        refreshWidgetData(id);
     }
 
     function refreshWidgetData(widgetId) {
