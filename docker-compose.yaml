@@ -9,6 +9,9 @@ services:
     environment:
       TZ: "Asia/Jakarta"
 
+    volumes:
+      - ./layout.json:/app/layout.json
+
     ports:
       - "10122:8080"
     logging:

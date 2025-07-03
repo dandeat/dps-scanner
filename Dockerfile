@@ -21,6 +21,7 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/main
 FROM --platform=linux/amd64 alpine:3.13.1
 
 RUN touch .env
+RUN touch layout.json
 ENV TZ=Asia/Jakarta
 
 RUN apk add --no-cache tzdata
@@ -31,7 +32,8 @@ RUN mkdir -p /assets
 
 # Copy Binary File from Builder Image
 COPY --from=builder /app/main /main
-COPY --from=builder /app/.env /.ENV
+COPY --from=builder /app/.env /.env
+COPY --from=builder /app/layout.json /layout.json
 COPY --from=builder /app/static /static
 
 # Run Binary File
