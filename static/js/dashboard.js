@@ -54,7 +54,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const savedWidgets = grid.engine.nodes.map(node => {
             const config = widgetConfigs.get(node.id);
             return {
-                x: node.x, y: node.y, w: node.w, h: node.h, id: node.id,
+                x: node.x, y: node.y, w: node.w, h: node.h, 
+                id: config.id,
                 title: config ? config.title : '',
                 model: config ? config.model : '',
                 fields: config ? config.fields : [],
