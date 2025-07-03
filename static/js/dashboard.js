@@ -79,12 +79,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     grid.commit();
                     
                     console.log('Layout loaded:', savedWidgets);
-                    savedWidgets.forEach(widgetData => {
-                        const id = widgetData.id;
-                        if (id && widgetData.model && widgetData.fields) {
-                            refreshWidgetData(id);
-                        }
-                    });
+                    // savedWidgets.forEach(widgetData => {
+                    //     const id = widgetData.id;
+                    //     if (id && widgetData.model && widgetData.fields) {
+                    //         refreshWidgetData(id);
+                    //     }
+                    // });
                 }
             })
             .catch(err => console.error('Failed to load layout:', err));
@@ -116,7 +116,6 @@ document.addEventListener('DOMContentLoaded', function () {
             contentEl.appendChild(innerContent);
         }
         
-        saveLayout(); // Save the new widget immediately
         refreshWidgetData(id);
     }
 
@@ -275,6 +274,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         
         createWidget({ title, model, fields, domain }, true);
+        saveLayout();
     });
 
     document.getElementById('autoRefreshToggle').addEventListener('change', (e) => toggleAutoRefresh(e.target.checked));
