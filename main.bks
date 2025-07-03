@@ -1,124 +1,262 @@
 package main
 
 import (
-	"context"
-	"dps-scanner-gateout/app"
-	"dps-scanner-gateout/constants"
-	"dps-scanner-gateout/routes"
-	"errors"
+	"bytes"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
-	"strconv"
-
-	mkpmobileutils "github.com/dandeat/mkpmobile-utils/src/utils"
-	"github.com/go-playground/locales/id"
-	ut "github.com/go-playground/universal-translator"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
-	"gopkg.in/go-playground/validator.v9"
-	id_translations "gopkg.in/go-playground/validator.v9/translations/id"
+	"os"
+	"text/template"
+	"time"
 )
 
-// CustomValidator adalah
-type CustomValidator struct {
-	validator  *validator.Validate
-	translator ut.Translator
+// OdooConfig holds your Odoo connection details.
+type OdooConfig struct {
+	AuthURL  string
+	CallURL  string
+	DB       string
+	Username string
+	Password string
 }
 
-// Passing Variable
-var (
-	uni         *ut.UniversalTranslator
-	echoHandler echo.Echo
-	ctx         = context.Background()
-)
+// DataRequest defines the structure for incoming API requests from the frontend.
+type DataRequest struct {
+	Model  string          `json:"model"`
+	Fields []string        `json:"fields"`
+	Domain [][]interface{} `json:"domain"` // NEW: Field for Odoo domain filter
+}
 
-// Custom Validator and translation
-func (cv *CustomValidator) Validate(i interface{}) error {
-	err := cv.validator.Struct(i)
+// DataResponse is the structure sent back to the frontend, including the total count.
+type DataResponse struct {
+	Records    []interface{} `json:"records"`
+	TotalCount int           `json:"total_count"`
+}
+
+// AuthResponse defines the structure of a successful authentication response.
+type AuthResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Result  struct {
+		SessionID string `json:"session_id"`
+		UID       int    `json:"uid"`
+	} `json:"result"`
+}
+
+// CountResponse defines the structure for an Odoo search_count result.
+type CountResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Result  int    `json:"result"`
+}
+
+// ReadResponse defines the structure for an Odoo search_read result.
+type ReadResponse struct {
+	Jsonrpc string        `json:"jsonrpc"`
+	Result  []interface{} `json:"result"`
+}
+
+// OdooErrorResponse defines the structure of an Odoo error response.
+type OdooErrorResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Error   struct {
+		Message string `json:"message"`
+		Code    int    `json:"code"`
+		Data    struct {
+			Debug string `json:"debug"`
+			Name  string `json:"name"`
+		} `json:"data"`
+	} `json:"error"`
+}
+
+// workerRequest sends a POST request with a JSON body.
+func workerRequest(url string, payload map[string]interface{}, sessionCookie *http.Cookie) ([]byte, []*http.Cookie, error) {
+	body, err := json.Marshal(payload)
 	if err != nil {
-		errs := err.(validator.ValidationErrors)
-		for _, row := range errs {
-			return errors.New(row.Translate(cv.translator))
-		}
+		return nil, nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	return cv.validator.Struct(i)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if sessionCookie != nil {
+		req.AddCookie(sessionCookie)
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr, Timeout: 30 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return responseBody, nil, fmt.Errorf("API returned non-200 status: %d", resp.StatusCode)
+	}
+
+	return responseBody, resp.Cookies(), nil
+}
+
+// authenticate with Odoo and get the session cookie.
+func (c *OdooConfig) authenticate() (*http.Cookie, error) {
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0", "method": "call", "params": map[string]interface{}{"db": c.DB, "login": c.Username, "password": c.Password, "context": map[string]interface{}{}},
+	}
+	body, cookies, err := workerRequest(c.AuthURL, payload, nil)
+	if err != nil {
+		return nil, fmt.Errorf("authentication worker failed: %w", err)
+	}
+	var authResp AuthResponse
+	if err := json.Unmarshal(body, &authResp); err != nil {
+		var errResp OdooErrorResponse
+		if json.Unmarshal(body, &errResp) == nil {
+			return nil, fmt.Errorf("Odoo auth error: %s", errResp.Error.Data.Debug)
+		}
+		return nil, fmt.Errorf("failed to unmarshal auth response: %w", err)
+	}
+	for _, cookie := range cookies {
+		if cookie.Name == "session_id" {
+			return cookie, nil
+		}
+	}
+	return nil, fmt.Errorf("session_id cookie not found")
+}
+
+// fetchDataAndCount gets the total record count and a limited list of records.
+func (c *OdooConfig) fetchDataAndCount(sessionCookie *http.Cookie, model string, fields []string, domain [][]interface{}, limit int) (*DataResponse, error) {
+	// Use an empty domain if the provided one is nil
+	if domain == nil {
+		domain = [][]interface{}{}
+	}
+
+	// 1. Get total count with the filter
+	countPayload := map[string]interface{}{
+		"jsonrpc": "2.0", "method": "call", "params": map[string]interface{}{"model": model, "method": "search_count", "args": []interface{}{domain}, "kwargs": map[string]interface{}{}},
+	}
+	countBody, _, err := workerRequest(c.CallURL, countPayload, sessionCookie)
+	if err != nil {
+		return nil, fmt.Errorf("count worker failed: %w", err)
+	}
+	var countResp CountResponse
+	if err := json.Unmarshal(countBody, &countResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal count response: %w", err)
+	}
+
+	// 2. Get limited data with the filter
+	readPayload := map[string]interface{}{
+		"jsonrpc": "2.0", "method": "call", "params": map[string]interface{}{"model": model, "method": "search_read", "args": []interface{}{domain}, "kwargs": map[string]interface{}{"fields": fields, "limit": limit}},
+	}
+	readBody, _, err := workerRequest(c.CallURL, readPayload, sessionCookie)
+	if err != nil {
+		return nil, fmt.Errorf("read worker failed: %w", err)
+	}
+	var readResp ReadResponse
+	if err := json.Unmarshal(readBody, &readResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal read response: %w", err)
+	}
+
+	// 3. Combine into a single response
+	finalResponse := &DataResponse{
+		Records:    readResp.Result,
+		TotalCount: countResp.Result,
+	}
+	return finalResponse, nil
 }
 
 func main() {
-	// Configuration Repository and Services
-	//Connect Mongo
-	// mongoDB := config.ConnectMongo(ctx)
-	// defer config.CloseMongo(ctx)
-
-	// repoRunNumb := runningNumberRepository.NewRepository(ctx, mongoDB)
-
-	services := app.SetupApp()
-
-	// Generate Access Token Scheduler
-
-	go routes.RoutesApi(&echoHandler, services)
-	port := fmt.Sprintf(":%s", "8080")
-	echoHandler.Logger.Fatal(echoHandler.Start(port))
-}
-
-// func schedulerAccessTokenSPay() {
-// 	helpers.GenAccessToken()
-// 	for range time.Tick(time.Second * time.Duration(config.SPAY_ACCESSTOKEN_SCHEDULAR_INTERVAL)) {
-// 		helpers.GenAccessToken()
-// 	}
-// }
-
-func init() {
-	// utils.InitLogger()
-	boardingService()
-
-	e := echo.New()
-	echoHandler = *e
-	validateCustom := validator.New()
-
-	id := id.New()
-	uni = ut.New(id, id)
-	trans, _ := uni.GetTranslator("id")
-	id_translations.RegisterDefaultTranslations(validateCustom, trans)
-	e.Validator = &CustomValidator{validator: validateCustom, translator: trans}
-
-	//LOG FILE
-	// f, err := os.OpenFile("logs/log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	// if err != nil {
-	// 	panic(fmt.Sprintf("error opening file: %v", err))
-	// }
-	// defer f.Close()
-
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: `{"time":"${time_rfc3339_nano}","id":"${id}","remote_ip":"${remote_ip}",` +
-			`"host":"${host}","method":"${method}","uri":"${uri}","user_agent":"${user_agent}",` +
-			`"status":${status},"error":"${error}","latency":${latency},"latency_human":"${latency_human}"` +
-			`,"bytes_in":${bytes_in},"bytes_out":${bytes_out}}` + "\n",
-		CustomTimeFormat: "2006-01-02 15:04:05.00000",
-	}))
-	// e.Logger.SetOutput(f)
-	e.Use(middleware.Recover())
-	e.Use(middleware.Secure())
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowCredentials: constants.TRUE_VALUE,
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
-	}))
-
-	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		report, ok := err.(*echo.HTTPError)
-		if !ok {
-			report = echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		result := mkpmobileutils.ResponseJSONV1(strconv.Itoa(report.Code), fmt.Sprintf("%v", report.Message), nil)
-		c.Logger().Error(report)
-		c.JSON(report.Code, result)
+	odooConfig := &OdooConfig{
+		AuthURL:  "https://transmarine.oneerp.id/web/session/authenticate",
+		CallURL:  "https://transmarine.oneerp.id/web/dataset/call_kw",
+		DB:       "transmarine_cn",
+		Username: "transmarine",
+		Password: "transmarine",
 	}
-}
 
-func boardingService() {
-	fmt.Println(`
-	
- `)
+	fs := http.FileServer(http.Dir("static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	http.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		tmpl, err := template.ParseFiles("static/dashboard.html")
+		if err != nil {
+			http.Error(w, "Could not parse template", http.StatusInternalServerError)
+			return
+		}
+		tmpl.Execute(w, nil)
+	})
+
+	http.HandleFunc("/api/odoo", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+		var req DataRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			return
+		}
+		if req.Model == "" || len(req.Fields) == 0 {
+			http.Error(w, "Model and fields are required", http.StatusBadRequest)
+			return
+		}
+		sessionCookie, err := odooConfig.authenticate()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Auth failed: %v", err), http.StatusUnauthorized)
+			return
+		}
+		// Pass the domain from the request to the fetch function
+		data, err := odooConfig.fetchDataAndCount(sessionCookie, req.Model, req.Fields, req.Domain, 15)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Fetch failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(data)
+	})
+
+	http.HandleFunc("/api/save_layout", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Error reading request body", http.StatusInternalServerError)
+			return
+		}
+		err = os.WriteFile("layout.json", body, 0644)
+		if err != nil {
+			http.Error(w, "Error saving layout", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	http.HandleFunc("/api/load_layout", func(w http.ResponseWriter, r *http.Request) {
+		data, err := os.ReadFile("layout.json")
+		if err != nil {
+			if os.IsNotExist(err) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte("[]"))
+				return
+			}
+			http.Error(w, "Error loading layout", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+	})
+
+	fmt.Println("Server starting at http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }

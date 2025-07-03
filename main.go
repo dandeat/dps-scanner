@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"crypto/tls"
 	"dps-scanner-gateout/constants"
 	"dps-scanner-gateout/utils"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -152,22 +157,6 @@ func scanHandler(c *gin.Context) {
 
 // Request KW
 type RequestKW struct {
-	// {
-	//     "params": {
-	//       "model": "dps.kemasan",
-	//       "method": "search_read",
-	//       "args": [],
-	//       "kwargs": {
-	//         "context": { "bin_size": true },
-	//         "domain": [
-	//           ["name", "=", "AL44021"]
-	//         ],
-	//         // "fields": ["id", "cn_id", "name", "no_sppb", "waktu_gatein", "hasil_periksa", "provinsi_penerima","kriteria_muat_id","kode_agen","note"],
-	//         "fields": ["id", "cn_id", "name", "no_sppb", "waktu_gatein", "hasil_periksa", "provinsi_penerima", "kode_agen", "note"],
-	//         "limit": 1
-	//       }
-	//     }
-	// }
 	Params RequestKWParams `json:"params"`
 }
 
@@ -198,41 +187,12 @@ type ResponseScanSuccess struct {
 		WaktuGateIn      string `json:"waktu_gatein"`
 		WaktuGateOut     any    `json:"waktu_gateout"`
 	} `json:"result"`
-	// Result []struct {
-	// 	// "id", "pjt", "name", "no_master", "kode_shipment", "no_sppb", "tgl_sppb", "waktu_gatein", "waktu_gateout", "status_akhir"
-	// 	Pjt              string `json:"pjt"`
-	// 	Name             string `json:"name"`
-	// 	NomorMaster      string `json:"no_master"`
-	// 	KodeShipment     any    `json:"kode_shipment"`
-	// 	ProvinsiPenerima any    `json:"provinsi_penerima"`
-	// 	ID               int    `json:"id"`
-	// 	NoSPPB           any    `json:"no_sppb"`
-	// 	CNID             []any  `json:"cn_id"`
-	// 	Note             any    `json:"note"`
-	// 	WaktuGateIn      string `json:"waktu_gatein"`
-	// 	WaktuGateOut     any    `json:"waktu_gateout"`
-	// } `json:"result"`
 	ID      any    `json:"id"`
 	Jsonrpc string `json:"jsonrpc"`
 }
 
 // Fake webhook logic
 func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
-
-	// Simulate call API
-	// response := DataMuatScan{
-	// 	StatusScan:       "approved",
-	// 	StatusDesc:       "Kemasan Approved, Silahkan Lanjutkan ke Gate Out",
-	// 	Barcode:          barcode,
-	// 	NoKemasan:        "AL44021",
-	// 	NoSPPB:           "001234",
-	// 	TglSPPB:          "2023-10-01",
-	// 	HasilPeriksa:     "Hijau",
-	// 	WaktuGateIn:      "2023-10-01T10:00:00Z",
-	// 	WaktuGateOut:     "2023-10-01T12:00:00Z",
-	// 	ProvinsiPenerima: "Jawa Barat",
-	// 	KodeAgen:         "AG",
-	// }
 
 	res = DataMuatScan{
 		StatusScan: "error",
@@ -252,20 +212,6 @@ func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
 			},
 		},
 	}
-
-	// requestScan := RequestKW{
-	// 	Params: RequestKWParams{
-	// 		Model:  "dps.kemasan.tps",
-	// 		Method: "search_read",
-	// 		Args:   []any{},
-	// 		Kwargs: Kwargs{
-	// 			Context: map[string]bool{"bin_size": true},
-	// 			Domain:  [][]any{{"name", "=", barcode}},
-	// 			Fields:  []string{"id", "pjt", "name", "no_master", "kode_shipment", "no_sppb", "tgl_sppb", "waktu_gatein", "waktu_gateout", "status_akhir"},
-	// 			Limit:   1,
-	// 		},
-	// 	},
-	// }
 
 	sessId, err := getTokenCron()
 	if err != nil {
@@ -290,29 +236,6 @@ func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
 		return res, err
 	}
 
-	// Parse response
-	/*
-	   {
-	       "result": [
-	           {
-	               "kode_agen": false,
-	               "name": "AL44021",
-	               "hasil_periksa": "hijau",
-	               "provinsi_penerima": false,
-	               "id": 5,
-	               "no_sppb": "060820",
-	               "cn_id": [
-	                   79885,
-	                   "AL44021"
-	               ],
-	               "note": false,
-	               "waktu_gatein": "2025-03-08 01:55:28"
-	           }
-	       ],
-	       "id": null,
-	       "jsonrpc": "2.0"
-	   }
-	*/
 	var response ResponseScanSuccess
 	if err := json.Unmarshal(result, &response); err != nil {
 		log.Println("Error unmarshalling response:", err)
@@ -357,14 +280,14 @@ func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
 		_, ok = response.Result[0].HasilPeriksa.(string)
 		if ok {
 			res.StatusScan = "approved"
-			// res.HasilPeriksa = 
+			// res.HasilPeriksa =
 			if res.HasilPeriksa, ok = response.Result[0].HasilPeriksa.(string); !ok {
 				res.StatusScan = "rejected"
 				res.StatusDesc = "terjadi kesalahan, hasil periksa tidak valid"
 				// return res, nil
 			} else if strings.HasPrefix(res.HasilPeriksa, "P2") {
 				res.StatusScan = "kuning"
-				res.StatusDesc = "Hasil Periksa "+res.HasilPeriksa+", Harap Konfirmasi ke Petugas"
+				res.StatusDesc = "Hasil Periksa " + res.HasilPeriksa + ", Harap Konfirmasi ke Petugas"
 				// return res, nil
 			}
 
@@ -374,8 +297,6 @@ func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
 			// 	args: [{ muat_id: id_muat, kemasan_id: vKode }],
 			// 	kwargs: {},
 			// }
-
-
 
 			reqAddMuatIds := map[string]any{
 				"params": map[string]any{
@@ -618,8 +539,184 @@ func getTokenCron() (sessId *http.Cookie, err error) {
 	return sessId, nil
 }
 
+// OdooConfig holds your Odoo connection details.
+type OdooConfig struct {
+	AuthURL  string
+	CallURL  string
+	DB       string
+	Username string
+	Password string
+}
+
+// DataRequest defines the structure for incoming API requests from the frontend.
+type DataRequest struct {
+	Model  string          `json:"model"`
+	Fields []string        `json:"fields"`
+	Domain [][]interface{} `json:"domain"` // NEW: Field for Odoo domain filter
+}
+
+// DataResponse is the structure sent back to the frontend, including the total count.
+type DataResponse struct {
+	Records    []interface{} `json:"records"`
+	TotalCount int           `json:"total_count"`
+}
+
+// AuthResponse defines the structure of a successful authentication response.
+type AuthResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Result  struct {
+		SessionID string `json:"session_id"`
+		UID       int    `json:"uid"`
+	} `json:"result"`
+}
+
+// CountResponse defines the structure for an Odoo search_count result.
+type CountResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Result  int    `json:"result"`
+}
+
+// ReadResponse defines the structure for an Odoo search_read result.
+type ReadResponse struct {
+	Jsonrpc string        `json:"jsonrpc"`
+	Result  []interface{} `json:"result"`
+}
+
+// OdooErrorResponse defines the structure of an Odoo error response.
+type OdooErrorResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Error   struct {
+		Message string `json:"message"`
+		Code    int    `json:"code"`
+		Data    struct {
+			Debug string `json:"debug"`
+			Name  string `json:"name"`
+		} `json:"data"`
+	} `json:"error"`
+}
+
+// workerRequest sends a POST request with a JSON body.
+func workerRequest(url string, payload map[string]interface{}, sessionCookie *http.Cookie) ([]byte, []*http.Cookie, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if sessionCookie != nil {
+		req.AddCookie(sessionCookie)
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr, Timeout: 30 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return responseBody, nil, fmt.Errorf("API returned non-200 status: %d", resp.StatusCode)
+	}
+
+	return responseBody, resp.Cookies(), nil
+}
+
+// authenticate with Odoo and get the session cookie.
+func (c *OdooConfig) authenticate() (*http.Cookie, error) {
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0", "method": "call", "params": map[string]interface{}{"db": c.DB, "login": c.Username, "password": c.Password, "context": map[string]interface{}{}},
+	}
+	body, cookies, err := workerRequest(c.AuthURL, payload, nil)
+	if err != nil {
+		return nil, fmt.Errorf("authentication worker failed: %w", err)
+	}
+	var authResp AuthResponse
+	if err := json.Unmarshal(body, &authResp); err != nil {
+		var errResp OdooErrorResponse
+		if json.Unmarshal(body, &errResp) == nil {
+			return nil, fmt.Errorf("Odoo auth error: %s", errResp.Error.Data.Debug)
+		}
+		return nil, fmt.Errorf("failed to unmarshal auth response: %w", err)
+	}
+	for _, cookie := range cookies {
+		if cookie.Name == "session_id" {
+			return cookie, nil
+		}
+	}
+	return nil, fmt.Errorf("session_id cookie not found")
+}
+
+// fetchDataAndCount gets the total record count and a limited list of records.
+func (c *OdooConfig) fetchDataAndCount(sessionCookie *http.Cookie, model string, fields []string, domain [][]interface{}, limit int) (*DataResponse, error) {
+	// Use an empty domain if the provided one is nil
+	if domain == nil {
+		domain = [][]interface{}{}
+	}
+
+	// 1. Get total count with the filter
+	countPayload := map[string]interface{}{
+		"jsonrpc": "2.0", "method": "call", "params": map[string]interface{}{"model": model, "method": "search_count", "args": []interface{}{domain}, "kwargs": map[string]interface{}{}},
+	}
+	countBody, _, err := workerRequest(c.CallURL, countPayload, sessionCookie)
+	if err != nil {
+		return nil, fmt.Errorf("count worker failed: %w", err)
+	}
+	var countResp CountResponse
+	if err := json.Unmarshal(countBody, &countResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal count response: %w", err)
+	}
+
+	// 2. Get limited data with the filter
+	readPayload := map[string]interface{}{
+		"jsonrpc": "2.0", "method": "call", "params": map[string]interface{}{"model": model, "method": "search_read", "args": []interface{}{domain}, "kwargs": map[string]interface{}{"fields": fields, "limit": limit}},
+	}
+	readBody, _, err := workerRequest(c.CallURL, readPayload, sessionCookie)
+	if err != nil {
+		return nil, fmt.Errorf("read worker failed: %w", err)
+	}
+	var readResp ReadResponse
+	if err := json.Unmarshal(readBody, &readResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal read response: %w", err)
+	}
+
+	// 3. Combine into a single response
+	finalResponse := &DataResponse{
+		Records:    readResp.Result,
+		TotalCount: countResp.Result,
+	}
+	return finalResponse, nil
+}
+
 func main() {
 	r := gin.Default()
+
+	odooConfig := &OdooConfig{
+		AuthURL:  "https://transmarine.oneerp.app/web/session/authenticate",
+		CallURL:  "https://transmarine.oneerp.app/web/dataset/call_kw",
+		DB:       "transmarine_cn",
+		Username: "transmarine",
+		Password: "transmarine",
+	}
+
+	// r.Use(func(c *gin.Context) {
+	// 	if c.Request.URL.Path == "/static/" || c.Request.URL.Path == "/static" {
+	// 		fs.ServeHTTP(c.Writer, c.Request)
+	// 		c.Abort()
+	// 	}
+	// })
 
 	// WebSocket + API
 	r.GET("/ws/:session_id", wsHandler)
@@ -629,6 +726,60 @@ func main() {
 
 	// ✅ Serve frontend at /ui
 	r.Static("/ui", "./static")
+
+	// r.Static("/ui/dashboard", "./static/dashboard.html")
+	r.POST("/api/odoo", func(c *gin.Context) {
+		var req DataRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+			return
+		}
+		// Authenticate and get session cookie
+
+		sessionCookie, err := odooConfig.authenticate()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "authentication failed", "details": err.Error()})
+			return
+		}
+
+		// Fetch data and count
+		response, err := odooConfig.fetchDataAndCount(sessionCookie, req.Model, req.Fields, req.Domain, 15)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "data fetch failed", "details": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, response)
+	})
+
+	r.GET("/api/load_layout", func(c *gin.Context) {
+		data, err := os.ReadFile("layout.json")
+		if err != nil {
+			if os.IsNotExist(err) {
+				c.JSON(http.StatusOK, []map[string]interface{}{}) // Return empty layout if file does not exist
+				return
+			}
+			log.Println("Error reading layout file:", err)
+			// Return a 500 Internal Server Error if reading the file fails
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read layout file", "details": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, json.RawMessage(data))
+	})
+
+	r.POST("/api/save_layout", func(c *gin.Context) {
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			log.Println("Error reading request body:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read request body", "details": err.Error()})
+			return
+		}
+		if err := os.WriteFile("layout.json", body, 0644); err != nil {
+			log.Println("Error saving layout file:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save layout file", "details": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, nil)
+	})
 
 	log.Println("Server running at http://localhost:8080")
 

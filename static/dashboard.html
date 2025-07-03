@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Odoo Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/gridstack@latest/dist/gridstack.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/ui/css/style.css">
+
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/gridstack@latest/dist/gridstack-all.js"></script>
+</head>
+
+<body>
+    <!-- NEW: Floating Action Button to toggle controls -->
+    <button id="toggleControlsBtn" class="fab">
+        <ion-icon name="settings-outline"></ion-icon>
+    </button>
+
+    <!-- NEW: A single container for all controls and the sidebar -->
+    <div id="configPanel" class="config-panel">
+        <h1>Odoo Dashboard</h1>
+        <div class="controls">
+            <input type="text" id="titleInput" placeholder="Widget Title (optional)">
+            <input type="text" id="modelInput" placeholder="Odoo Model (e.g., res.partner)" value="dps.shipment">
+            <input type="text" id="fieldsInput" placeholder="Fields (e.g., name,email)" value="name">
+            <input type="text" id="filterInput"
+                placeholder="Domain e.g., [ [&quot;name&quot;,&quot;ilike&quot;,&quot;A&quot;] ]">
+            <button id="fetchButton">Add Widget</button>
+        </div>
+        <div class="sidebar-tools">
+            <div id="trash" class="trash-can">
+                <ion-icon name="trash-outline"></ion-icon>
+                <div>Drop to remove</div>
+            </div>
+            <div class="tool-panel">
+                <h4>Auto Refresh</h4>
+                <label class="toggle-switch-label">
+                    <input type="checkbox" id="autoRefreshToggle" class="toggle-switch">
+                    <span class="slider"></span>
+                    <span>Enable</span>
+                </label>
+                <input type="number" id="refreshInterval" value="60" min="5">
+                <span>seconds</span>
+            </div>
+            <div class="tool-panel">
+                <h4>Theme</h4>
+                <label class="toggle-switch-label">
+                    <input type="checkbox" id="themeToggle" class="toggle-switch">
+                    <span class="slider"></span>
+                    <span>Dark Mode</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- The dashboard grid now takes up the full space -->
+    <div class="dashboard">
+        <div class="grid-stack"></div>
+    </div>
+
+    <!-- Widget Configuration Modal (no changes) -->
+    <div id="configModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2>Edit Widget</h2>
+            <input type="hidden" id="configWidgetId">
+            <div class="form-group">
+                <label for="configTitle">Title</label>
+                <input type="text" id="configTitle" placeholder="Widget Title (optional)">
+            </div>
+            <div class="form-group">
+                <label for="configModel">Odoo Model</label>
+                <input type="text" id="configModel" placeholder="e.g., res.partner">
+            </div>
+            <div class="form-group">
+                <label for="configFields">Fields</label>
+                <input type="text" id="configFields" placeholder="e.g., name,email">
+            </div>
+            <div class="form-group">
+                <label for="configDomain">Domain Filter</label>
+                <textarea id="configDomain" rows="4" placeholder='e.g., [["name", "ilike", "A"]]'></textarea>
+            </div>
+            <div class="modal-actions">
+                <button id="saveConfigBtn" class="btn-primary">Save Changes</button>
+                <button id="cancelConfigBtn" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/ui/js/dashboard.js"></script>
+</body>
+
+</html>

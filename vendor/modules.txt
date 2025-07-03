@@ -61,7 +61,6 @@ github.com/gin-gonic/gin/render
 ## explicit; go 1.17
 github.com/go-playground/locales
 github.com/go-playground/locales/currency
-github.com/go-playground/locales/id
 # github.com/go-playground/universal-translator v0.18.1
 ## explicit; go 1.18
 github.com/go-playground/universal-translator
@@ -269,12 +268,6 @@ google.golang.org/protobuf/proto
 google.golang.org/protobuf/reflect/protoreflect
 google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
-# gopkg.in/go-playground/assert.v1 v1.2.1
-## explicit
-# gopkg.in/go-playground/validator.v9 v9.31.0
-## explicit
-gopkg.in/go-playground/validator.v9
-gopkg.in/go-playground/validator.v9/translations/id
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
