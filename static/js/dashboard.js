@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function createWidget(widgetData, isNew = false) {
-        const id = widgetData.id 
+        const id = widgetData.id || 'widget-' + Date.now(); 
         widgetConfigs.set(id, {
             id: id,
             title: widgetData.title,
