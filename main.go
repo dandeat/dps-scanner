@@ -346,17 +346,26 @@ func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
 			return res, nil
 		}
 
+		isGateout := response.Result[0].WaktuGateOut != nil && response.Result[0].WaktuGateOut != ""
+		if isGateout {
+			res.StatusScan = "approved"
+			res.StatusDesc = "Kemasan Sudah Scan Gate Out, Silahkan Lanjutkan ke Proses Berikutnya"
+			res.WaktuGateOut = response.Result[0].WaktuGateOut.(string)
+			return res, nil
+		}
+
 		_, ok = response.Result[0].HasilPeriksa.(string)
 		if ok {
 			res.StatusScan = "approved"
-			res.HasilPeriksa = response.Result[0].HasilPeriksa.(string)
-
-			// if first 2 character is P2
-			if strings.HasPrefix(res.HasilPeriksa, "P2") {
-				// res.StatusScan = "rejected"
-				res.StatusDesc = "Hasil Periksa Belum Hijau, Silahkan Kembali ke Gudang"
-
-				// 	return res, nil
+			// res.HasilPeriksa = 
+			if res.HasilPeriksa, ok = response.Result[0].HasilPeriksa.(string); !ok {
+				res.StatusScan = "rejected"
+				res.StatusDesc = "terjadi kesalahan, hasil periksa tidak valid"
+				// return res, nil
+			} else if strings.HasPrefix(res.HasilPeriksa, "P2") {
+				res.StatusScan = "kuning"
+				res.StatusDesc = "Hasil Periksa "+res.HasilPeriksa+", Harap Konfirmasi ke Petugas"
+				// return res, nil
 			}
 
 			// {
@@ -365,6 +374,8 @@ func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
 			// 	args: [{ muat_id: id_muat, kemasan_id: vKode }],
 			// 	kwargs: {},
 			// }
+
+
 
 			reqAddMuatIds := map[string]any{
 				"params": map[string]any{
@@ -404,12 +415,12 @@ func CallScanMuat(muatId, barcode string) (res DataMuatScan, err error) {
 			if err := json.Unmarshal(resp, &response); err != nil {
 				log.Println("Error unmarshalling response:", err)
 				res.StatusScan = "rejected"
-				res.StatusDesc = "Kemasan Sudah Termuat"
+				res.StatusDesc = "Terjadi Kesalahan, Silahkan Coba Lagi"
 			}
 			if response["result"] == nil {
 				log.Println("Failed to add muat:", response)
 				res.StatusScan = "rejected"
-				res.StatusDesc = "Kemasan Sudah Termuat"
+				res.StatusDesc = "Terjadi Kesalahan, Silahkan Coba Lagi"
 			}
 			log.Println("Muat added successfully:", response)
 

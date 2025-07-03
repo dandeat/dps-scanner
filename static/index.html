@@ -5,13 +5,17 @@
     <meta charset="UTF-8" />
     <title>Scan Monitor</title>
     <style>
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: "Segoe UI", Roboto, Arial, sans-serif;
             background-color: #1e1e1e;
             color: #f0f0f0;
         }
+
         .centered {
             display: flex;
             flex-direction: column;
@@ -20,16 +24,38 @@
             height: 100vh;
             gap: 10px;
         }
-        input, select, button {
+
+        input,
+        select,
+        button {
             padding: 10px;
             font-size: 16px;
             border-radius: 5px;
             border: none;
             width: 300px;
         }
-        button { cursor: pointer; background-color: #3498db; color: white; }
-        .layout { display: none; flex-direction: row; height: 100vh; padding: 20px; gap: 20px; }
-        .left { flex: 2; display: flex; flex-direction: column; gap: 20px; }
+
+        button {
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+        }
+
+        .layout {
+            display: none;
+            flex-direction: row;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .left {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
         .barcode-display {
             font-size: 2.5rem;
             font-weight: bold;
@@ -39,6 +65,7 @@
             color: #ffd700;
             word-break: break-word;
         }
+
         .details-box {
             background-color: #2a2a2a;
             padding: 20px;
@@ -48,10 +75,36 @@
             line-height: 1.6;
             min-height: 300px;
         }
-        .status-approved { background-color: #228B22 !important; color: #fff; }
-        .status-rejected { background-color: #8B0000 !important; color: #fff; }
-        .right { flex: 1; background-color: #2a2a2a; border-radius: 10px; padding: 20px; overflow-y: auto; }
-        .right h3 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+
+        .status-approved {
+            background-color: #228B22 !important;
+            color: #fff;
+        }
+
+        .status-kuning {
+            background-color: #c4d202 !important;
+            color: #fff;
+        }
+
+        .status-rejected {
+            background-color: #8B0000 !important;
+            color: #fff;
+        }
+
+        .right {
+            flex: 1;
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .right h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
         .history-item {
             background-color: #3c3c3c;
             padding: 10px;
@@ -59,6 +112,7 @@
             margin-bottom: 10px;
             font-size: 0.95rem;
         }
+
         .recent-scan {
             background-color: #ffd700 !important;
             color: #000;
@@ -74,7 +128,8 @@
         <input type="text" id="sessionInput" placeholder="Contoh: session123">
         <button onclick="loadMuatList()">Lanjut</button>
 
-        <div id="muatSelection" style="display:none; flex-direction: column; align-items: center; gap: 10px; margin-top: 20px;">
+        <div id="muatSelection"
+            style="display:none; flex-direction: column; align-items: center; gap: 10px; margin-top: 20px;">
             <h3>Pilih Muat:</h3>
             <select id="muatDropdown"></select>
             <button onclick="startMonitoring()">Mulai Scan</button>
@@ -163,8 +218,9 @@
                 const data = response.data || {};
                 const detailsBox = document.getElementById("scanDetails");
 
-                detailsBox.classList.remove("status-approved", "status-rejected");
+                detailsBox.classList.remove("status-approved", "status-kuning", "status-rejected");
                 if (data.status_scan === "approved") detailsBox.classList.add("status-approved");
+                else if (data.status_scan === "kuning") detailsBox.classList.add("status-kuning");
                 else if (data.status_scan === "rejected") detailsBox.classList.add("status-rejected");
 
                 document.getElementById("barcodeString").textContent = barcodeString;
@@ -189,7 +245,13 @@
                 historyItem.textContent = barcodeString;
                 historyList.prepend(historyItem);
 
-                speakIndonesian(data.status_scan === "approved" ? "Disetujui" : `Ditolak. ${data.status_desc || ""}`);
+                var speak = ""
+                if (data.status_scan === "approved") speak = "Disetujui";
+                else if (data.status_scan === "kuning") speak = `${data.status_desc || ""}`;
+                else if (data.status_scan === "rejected") speak = `Ditolak. ${data.status_desc || ""}`;
+
+
+                speakIndonesian(speak);
             };
         }
 
@@ -233,4 +295,5 @@
         };
     </script>
 </body>
+
 </html>
