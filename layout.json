@@ -1,1 +1,1 @@
-[{"x":0,"y":0,"w":4,"h":4,"id":"widget-1751538584628","title":"Shipment Belum Keluar","model":"dps.kemasan.tps","fields":["pjt","name","waktu_gatein","status_akhir","durasi"],"domain":[["pjt","ilike","Transmarine"],["waktu_gateout","=",false]]}]
+[{"x":0,"y":0,"w":5,"h":5,"id":"widget-1751538584628","title":"Shipment Belum Keluar","model":"dps.kemasan.tps","fields":["pjt","name","waktu_gatein","status_akhir","durasi"],"domain":[["pjt","ilike","Transmarine"],["waktu_gateout","=",false]],"limit":20}]

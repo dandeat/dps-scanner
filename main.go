@@ -553,6 +553,7 @@ type DataRequest struct {
 	Model  string          `json:"model"`
 	Fields []string        `json:"fields"`
 	Domain [][]interface{} `json:"domain"` // NEW: Field for Odoo domain filter
+	Limit  int             `json:"limit"`  // NEW: Field for limiting the number of records
 }
 
 // DataResponse is the structure sent back to the frontend, including the total count.
@@ -743,7 +744,7 @@ func main() {
 		}
 
 		// Fetch data and count
-		response, err := odooConfig.fetchDataAndCount(sessionCookie, req.Model, req.Fields, req.Domain, 15)
+		response, err := odooConfig.fetchDataAndCount(sessionCookie, req.Model, req.Fields, req.Domain, req.Limit)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "data fetch failed", "details": err.Error()})
 			return
@@ -752,7 +753,7 @@ func main() {
 	})
 
 	r.GET("/api/load_layout", func(c *gin.Context) {
-		data, err := os.ReadFile("layout.json")
+		data, err := os.ReadFile("./layout.json")
 		if err != nil {
 			if os.IsNotExist(err) {
 				c.JSON(http.StatusOK, []map[string]interface{}{}) // Return empty layout if file does not exist
@@ -773,7 +774,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read request body", "details": err.Error()})
 			return
 		}
-		if err := os.WriteFile("layout.json", body, 0644); err != nil {
+		if err := os.WriteFile("./layout.json", body, 0644); err != nil {
 			log.Println("Error saving layout file:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save layout file", "details": err.Error()})
 			return
@@ -782,24 +783,5 @@ func main() {
 	})
 
 	log.Println("Server running at http://localhost:8080")
-
-	// add Logger with request body
-	// r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-	// 	// param.Request.Body is a io.ReadCloser, you can read it here
-	// 	// but you need to copy it to a buffer if you want to log it
-	// 	// param.Request.Body.Close() is not needed here, gin will do it for you
-	// 	// param.Request.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-	// 	// return the log string
-	// 	return fmt.Sprintf("%s %s %s %s %d %s %s\n%s",
-	// 		param.TimeStamp.Format(time.RFC3339),
-	// 		param.ClientIP,
-	// 		param.Method,
-	// 		param.Path,
-	// 		param.StatusCode,
-	// 		param.Latency,
-	// 		param.ErrorMessage,
-	// 		param.Request.UserAgent(),
-	// 	)
-	// }))
 	r.Run(":8080")
 }

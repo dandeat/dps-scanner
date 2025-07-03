@@ -33,6 +33,42 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     applyPanelState(localStorage.getItem('configPanelHidden') === 'true');
 
+    // --- Auto-Refresh Setup ---
+    const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+    const refreshIntervalInput = document.getElementById('refreshInterval');
+    const applyAutoRefresh = (enabled) => {
+        autoRefreshToggle.checked = enabled;
+        refreshIntervalInput.value = localStorage.getItem('refreshInterval') || 30;
+        toggleAutoRefresh(enabled);
+    };
+    autoRefreshToggle.addEventListener('change', () => {
+        const enabled = autoRefreshToggle.checked;
+        localStorage.setItem('autoRefreshEnabled', enabled);
+        localStorage.setItem('refreshInterval', refreshIntervalInput.value);
+        toggleAutoRefresh(enabled);
+    });
+    applyAutoRefresh(localStorage.getItem('autoRefreshEnabled') === 'true');
+    refreshIntervalInput.addEventListener('change', () => {
+        const intervalSeconds = refreshIntervalInput.value;
+        localStorage.setItem('refreshInterval', intervalSeconds);
+        if (autoRefreshToggle.checked) {
+            toggleAutoRefresh(true);
+        }
+    });
+
+    function toggleAutoRefresh(enabled) {
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+
+        if (enabled) {
+            const intervalSeconds = localStorage.getItem('refreshInterval') || 30;
+            autoRefreshTimer = setInterval(() => {
+                widgetConfigs.forEach((config, id) => refreshWidgetData(id));
+            }, intervalSeconds * 1000);
+        }
+    }
+    
+
 
     // --- Grid and Widget Functions ---
     function initGrid() {
@@ -52,14 +88,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function saveLayout() {
         const savedWidgets = grid.engine.nodes.map(node => {
+            console.log(node)
             const config = widgetConfigs.get(node.id);
+            console.log(config)
+            if (!config) return null; // Skip if no config found for this widget
+            else if (config.model === null || config.model === undefined) {
+                console.warn(`Widget ${node.id} has no model defined, skipping save.`);
+                return null; // Skip saving this widget
+            } else if (config.fields === null || config.fields === undefined) {
+                console.warn(`Widget ${node.id} has no fields defined, skipping save.`);
+                return null; // Skip saving this widget
+            }
+            
             return {
                 x: node.x, y: node.y, w: node.w, h: node.h, 
                 id: config.id,
-                title: config ? config.title : '',
+                title: config ? config.title : config.model,
                 model: config ? config.model : '',
                 fields: config ? config.fields : [],
                 domain: config ? config.domain : [],
+                limit: config ? config.limit : 15, 
             };
         });
         fetch('/api/save_layout', {
@@ -79,12 +127,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     grid.commit();
                     
                     console.log('Layout loaded:', savedWidgets);
-                    // savedWidgets.forEach(widgetData => {
-                    //     const id = widgetData.id;
-                    //     if (id && widgetData.model && widgetData.fields) {
-                    //         refreshWidgetData(id);
-                    //     }
-                    // });
                 }
             })
             .catch(err => console.error('Failed to load layout:', err));
@@ -93,10 +135,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function createWidget(widgetData, isNew = false) {
         const id = widgetData.id 
         widgetConfigs.set(id, {
+            id: id,
             title: widgetData.title,
             model: widgetData.model,
             fields: widgetData.fields,
             domain: widgetData.domain,
+            limit: widgetData.limit || 15,
         });
 
         console.log('Creating widget:', id, widgetData);
@@ -145,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('/api/odoo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: config.model, fields: config.fields, domain: config.domain }),
+            body: JSON.stringify({ model: config.model, fields: config.fields, domain: config.domain, limit: config.limit }),
         })
         .then(response => {
             console.log('Response status:', response.status);
@@ -198,18 +242,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function toggleAutoRefresh(enabled) {
-        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-        autoRefreshTimer = null;
-
-        if (enabled) {
-            const intervalSeconds = document.getElementById('refreshInterval').value;
-            autoRefreshTimer = setInterval(() => {
-                widgetConfigs.forEach((config, id) => refreshWidgetData(id));
-            }, intervalSeconds * 1000);
-        }
-    }
-
     // --- Modal Logic ---
     const configModal = document.getElementById('configModal');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
@@ -223,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('configModel').value = config.model;
         document.getElementById('configFields').value = config.fields.join(',');
         document.getElementById('configDomain').value = JSON.stringify(config.domain, null, 2);
+        document.getElementById('configLimit').value = config.limit || 15;
         configModal.style.display = 'flex';
     }
 
@@ -241,6 +274,7 @@ document.addEventListener('DOMContentLoaded', function () {
             config.model = document.getElementById('configModel').value;
             config.fields = document.getElementById('configFields').value.split(',').map(f => f.trim()).filter(f => f);
             config.domain = domain;
+            config.limit = parseInt(document.getElementById('configLimit').value, 10) || 15;
             
             refreshWidgetData(widgetId);
             saveLayout();
@@ -255,16 +289,49 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.target === configModal) closeConfigModal();
     });
 
+    // --- Add Widget Modal Logic ---
+    const addWidgetModal = document.getElementById('addWidgetModal');
+    // const saveWidgetBtn = document.getElementById('saveWidgetBtn');
+    const cancelWidgetBtn = document.getElementById('cancelWidgetBtn');
+
+    function openAddWidgetModal() {
+        addWidgetModal.style.display = 'flex';
+    }
+
+    function closeAddWidgetModal() {
+        addWidgetModal.style.display = 'none';
+    }
+
+    // saveWidgetBtn.addEventListener('click', () => {
+    //     const title = document.getElementById('titleInput').value;
+    //     const model = document.getElementById('modelInput').value;
+    //     const fields = document.getElementById('fieldsInput').value.split(',').map(f => f.trim()).filter(f => f);
+    //     const domain = JSON.parse(document.getElementById('domainInput').value);
+    //     const limit = parseInt(document.getElementById('limitInput').value, 10) || 15;
+
+    //     createWidget({ title, model, fields, domain, limit });
+    //     closeAddWidgetModal();
+    // });
+    cancelWidgetBtn.addEventListener('click', closeAddWidgetModal);
+    addWidgetModal.addEventListener('click', (e) => {
+        if (e.target === addWidgetModal) closeAddWidgetModal();
+    });
+
+
 
     // --- Event Listeners ---
     document.getElementById('fetchButton').addEventListener('click', () => {
         const title = document.getElementById('titleInput').value;
         const model = document.getElementById('modelInput').value;
         const fields = document.getElementById('fieldsInput').value.split(',').map(f => f.trim()).filter(f => f);
-        const filterText = document.getElementById('filterInput').value;
+        const filterText = document.getElementById('domainInput').value;
+        const limit = parseInt(document.getElementById('limitInput').value, 10) || 15;
         let domain = [];
 
-        if (!model || fields.length === 0) return;
+        if (!model || fields.length === 0) {
+            alert('Model and Fields are required to create a widget.');
+            return;
+        }
 
         try {
             if (filterText) domain = JSON.parse(filterText);
@@ -273,17 +340,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         
-        createWidget({ title, model, fields, domain }, true);
+        createWidget({ title, model, fields, domain, limit }, true);
+        closeAddWidgetModal();
         saveLayout();
     });
 
-    document.getElementById('autoRefreshToggle').addEventListener('change', (e) => toggleAutoRefresh(e.target.checked));
-    document.getElementById('refreshInterval').addEventListener('change', () => {
-        if (document.getElementById('autoRefreshToggle').checked) {
-            toggleAutoRefresh(true);
-        }
-    });
-    
+    document.getElementById('addWidgetBtn').addEventListener('click', openAddWidgetModal);
+
     document.querySelector('.dashboard').addEventListener('click', (e) => {
         if (e.target.classList.contains('refresh-icon')) {
             refreshWidgetData(e.target.dataset.widgetId);

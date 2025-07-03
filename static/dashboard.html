@@ -24,15 +24,10 @@
     <!-- NEW: A single container for all controls and the sidebar -->
     <div id="configPanel" class="config-panel">
         <h1>Odoo Dashboard</h1>
-        <div class="controls">
-            <input type="text" id="titleInput" placeholder="Widget Title (optional)">
-            <input type="text" id="modelInput" placeholder="Odoo Model (e.g., res.partner)" value="dps.shipment">
-            <input type="text" id="fieldsInput" placeholder="Fields (e.g., name,email)" value="name">
-            <input type="text" id="filterInput"
-                placeholder="Domain e.g., [ [&quot;name&quot;,&quot;ilike&quot;,&quot;A&quot;] ]">
-            <button id="fetchButton">Add Widget</button>
-        </div>
+
         <div class="sidebar-tools">
+            <button id="addWidgetBtn" class="btn-primary">Add Widget</button>
+
             <div id="trash" class="trash-can">
                 <ion-icon name="trash-outline"></ion-icon>
                 <div>Drop to remove</div>
@@ -63,6 +58,48 @@
         <div class="grid-stack"></div>
     </div>
 
+    <!-- Add Widget  Modal (no changes) -->
+    <div id="addWidgetModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <!-- <div class="controls">
+                <input type="text" id="titleInput" placeholder="Widget Title (optional)">
+                <input type="text" id="modelInput" placeholder="Odoo Model (e.g., res.partner)" value="dps.shipment">
+                <input type="text" id="fieldsInput" placeholder="Fields (e.g., name,email)" value="name">
+                <input type="text" id="filterInput"
+                    placeholder="Domain e.g., [ [&quot;name&quot;,&quot;ilike&quot;,&quot;A&quot;] ]">
+                <input type="number" id="limitInput" placeholder="Limit (default 15)" value="15" min="1">
+                <button id="fetchButton">Add Widget</button>
+            </div> -->
+            <h2>Add Widget</h2>
+            <input type="hidden" id="addWidgetId">
+            <div class="form-group">
+                <label for="titleInput">Title</label>
+                <input type="text" id="titleInput" placeholder="Widget Title (optional)">
+            </div>
+            <div class="form-group">
+                <label for="modelInput">Odoo Model</label>
+                <input type="text" id="modelInput" placeholder="e.g., res.partner">
+            </div>
+            <div class="form-group">
+                <label for="fieldsInput">Fields</label>
+                <input type="text" id="fieldsInput" placeholder="e.g., name,email">
+            </div>
+            <div class="form-group">
+                <label for="domainInput">Domain Filter</label>
+                <textarea id="domainInput" rows="4" placeholder='e.g., [["name", "ilike", "A"]]'></textarea>
+            </div>
+            <div class="form-group">
+                <label for="limitInput">Limit</label>
+                <input type="number" id="limitInput" placeholder="Default 15" min="1">
+            </div>
+            <div class="modal-actions">
+                <button id="fetchButton" class="btn-primary">Add Widget</button>
+                <button id="cancelWidgetBtn" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Widget Configuration Modal (no changes) -->
     <div id="configModal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
@@ -83,6 +120,10 @@
             <div class="form-group">
                 <label for="configDomain">Domain Filter</label>
                 <textarea id="configDomain" rows="4" placeholder='e.g., [["name", "ilike", "A"]]'></textarea>
+            </div>
+            <div class="form-group">
+                <label for="configLimit">Limit</label>
+                <input type="number" id="configLimit" placeholder="Default 15" value="15" min="1">
             </div>
             <div class="modal-actions">
                 <button id="saveConfigBtn" class="btn-primary">Save Changes</button>
