@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }, intervalSeconds * 1000);
         }
     }
-    
+
 
 
     // --- Grid and Widget Functions ---
@@ -99,15 +99,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.warn(`Widget ${node.id} has no fields defined, skipping save.`);
                 return null; // Skip saving this widget
             }
-            
+
             return {
-                x: node.x, y: node.y, w: node.w, h: node.h, 
+                x: node.x, y: node.y, w: node.w, h: node.h,
                 id: config.id,
                 title: config ? config.title : config.model,
                 model: config ? config.model : '',
                 fields: config ? config.fields : [],
                 domain: config ? config.domain : [],
-                limit: config ? config.limit : 15, 
+                limit: config ? config.limit : 15,
             };
         });
         fetch('/api/save_layout', {
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     grid.batchUpdate();
                     savedWidgets.forEach(widgetData => createWidget(widgetData, false));
                     grid.commit();
-                    
+
                     console.log('Layout loaded:', savedWidgets);
                 }
             })
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function createWidget(widgetData, isNew = false) {
-        const id = widgetData.id || 'widget-' + Date.now(); 
+        const id = widgetData.id || 'widget-' + Date.now();
         widgetConfigs.set(id, {
             id: id,
             title: widgetData.title,
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
             innerContent.className = 'grid-stack-item-content-inner';
             contentEl.appendChild(innerContent);
         }
-        
+
         refreshWidgetData(id);
     }
 
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!widgetEl) return;
 
         console.log('Widget element found:', widgetEl);
-        
+
         const contentInnerEl = widgetEl.querySelector('.grid-stack-item-content-inner');
         if (contentInnerEl) {
             contentInnerEl.classList.add('loading');
@@ -191,21 +191,21 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: config.model, fields: config.fields, domain: config.domain, limit: config.limit }),
         })
-        .then(response => {
-            console.log('Response status:', response.status);
-            
-            if (!response.ok) return response.text().then(text => { throw new Error(text) });
-            return response.json();
-        })
-        .then(data => {
-            console.log('Data received for widget:', widgetId, data);
+            .then(response => {
+                console.log('Response status:', response.status);
 
-            const records = data.records;
-            const totalCount = data.total_count;
-            if (!records) throw new Error("No records found in the response.");
+                if (!response.ok) return response.text().then(text => { throw new Error(text) });
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data received for widget:', widgetId, data);
 
-            const displayTitle = config.title || config.model;
-            let headerHTML = `<div class="widget-header">
+                const records = data.records;
+                const totalCount = data.total_count;
+                if (!records) throw new Error("No records found in the response.");
+
+                const displayTitle = config.title || config.model;
+                let headerHTML = `<div class="widget-header">
                                   <h4 class="widget-title" contenteditable="true" data-widget-id="${widgetId}">${displayTitle}</h4>
                                   <span class="record-count">(${records.length} of ${totalCount})</span>
                                   <div class="widget-actions">
@@ -213,33 +213,33 @@ document.addEventListener('DOMContentLoaded', function () {
                                       <ion-icon name="refresh-outline" class="refresh-icon" data-widget-id="${widgetId}"></ion-icon>
                                   </div>
                               </div>`;
-            let tableHTML = '<div class="table-container"><table><thead><tr>';
-            config.fields.forEach(field => tableHTML += `<th>${(field.charAt(0).toUpperCase() + field.slice(1)).replace(/_/g, ' ')}</th>`);
-            tableHTML += '</tr></thead><tbody>';
-            records.forEach(item => {
-                tableHTML += '<tr>';
-                config.fields.forEach(field => {
-                    let value = item[field];
-                    if (Array.isArray(value) && value.length > 0) value = value[1];
-                    else if (value === false || value === null || value === undefined) value = '–';
-                    tableHTML += `<td>${value}</td>`;
+                let tableHTML = '<div class="table-container"><table><thead><tr>';
+                config.fields.forEach(field => tableHTML += `<th>${(field.charAt(0).toUpperCase() + field.slice(1)).replace(/_/g, ' ')}</th>`);
+                tableHTML += '</tr></thead><tbody>';
+                records.forEach(item => {
+                    tableHTML += '<tr>';
+                    config.fields.forEach(field => {
+                        let value = item[field];
+                        if (Array.isArray(value) && value.length > 0) value = value[1];
+                        else if (value === false || value === null || value === undefined) value = '–';
+                        tableHTML += `<td>${value}</td>`;
+                    });
+                    tableHTML += '</tr>';
                 });
-                tableHTML += '</tr>';
+                tableHTML += '</tbody></table></div>';
+                if (contentInnerEl) {
+                    contentInnerEl.innerHTML = headerHTML + tableHTML;
+                    contentInnerEl.classList.remove('loading');
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing widget:', widgetId, error);
+                if (contentInnerEl) {
+                    const errorHTML = `<div class="widget-header"><h4>${config.model}</h4><ion-icon name="settings-outline" class="config-icon" data-widget-id="${widgetId}"></ion-icon><ion-icon name="refresh-outline" class="refresh-icon" data-widget-id="${widgetId}"></ion-icon></div><div class="error-msg">Failed to load: ${error.message}</div>`;
+                    contentInnerEl.innerHTML = errorHTML;
+                    contentInnerEl.classList.remove('loading');
+                }
             });
-            tableHTML += '</tbody></table></div>';
-            if (contentInnerEl) {
-                contentInnerEl.innerHTML = headerHTML + tableHTML;
-                contentInnerEl.classList.remove('loading');
-            }
-        })
-        .catch(error => {
-            console.error('Error refreshing widget:', widgetId, error);
-            if (contentInnerEl) {
-                const errorHTML = `<div class="widget-header"><h4>${config.model}</h4><ion-icon name="settings-outline" class="config-icon" data-widget-id="${widgetId}"></ion-icon><ion-icon name="refresh-outline" class="refresh-icon" data-widget-id="${widgetId}"></ion-icon></div><div class="error-msg">Failed to load: ${error.message}</div>`;
-                contentInnerEl.innerHTML = errorHTML;
-                contentInnerEl.classList.remove('loading');
-            }
-        });
     }
 
     // --- Modal Logic ---
@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
             config.fields = document.getElementById('configFields').value.split(',').map(f => f.trim()).filter(f => f);
             config.domain = domain;
             config.limit = parseInt(document.getElementById('configLimit').value, 10) || 15;
-            
+
             refreshWidgetData(widgetId);
             saveLayout();
             closeConfigModal();
@@ -339,10 +339,34 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('Invalid Domain format. Must be valid JSON, e.g., [["name", "ilike", "test"]]');
             return;
         }
-        
+
         createWidget({ title, model, fields, domain, limit }, true);
         closeAddWidgetModal();
         saveLayout();
+    });
+    document.getElementById('duplicateConfigBtn').addEventListener('click', () => {
+        const title = document.getElementById('configTitle').value;
+        const model = document.getElementById('configModel').value;
+        const fields = document.getElementById('configFields').value.split(',').map(f => f.trim()).filter(f => f);
+        const filterText = document.getElementById('configDomain').value;
+        const limit = parseInt(document.getElementById('configLimit').value, 10) || 15;
+        let domain = [];
+
+        if (!model || fields.length === 0) {
+            alert('Model and Fields are required to create a widget.');
+            return;
+        }
+
+        try {
+            if (filterText) domain = JSON.parse(filterText);
+        } catch (e) {
+            alert('Invalid Domain format. Must be valid JSON, e.g., [["name", "ilike", "test"]]');
+            return;
+        }
+
+        createWidget({ title, model, fields, domain, limit }, true);
+        saveLayout();
+        closeConfigModal();
     });
 
     document.getElementById('addWidgetBtn').addEventListener('click', openAddWidgetModal);
