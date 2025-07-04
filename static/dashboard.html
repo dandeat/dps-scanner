@@ -73,6 +73,13 @@
             <h2>Add Widget</h2>
             <input type="hidden" id="addWidgetId">
             <div class="form-group">
+                <label for="widgetTypeInput">Widget Type</label>
+                <select id="widgetTypeInput">
+                    <option value="table" selected>Table</option>
+                    <option value="number">Number</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label for="titleInput">Title</label>
                 <input type="text" id="titleInput" placeholder="Widget Title (optional)">
             </div>
@@ -105,6 +112,13 @@
         <div class="modal-content">
             <h2>Edit Widget</h2>
             <input type="hidden" id="configWidgetId">
+            <div class="form-group">
+                <label for="configType">Type</label>
+                <select id="configType">
+                    <option value="table">Table</option>
+                    <option value="number">Number</option>
+                </select>
+            </div>
             <div class="form-group">
                 <label for="configTitle">Title</label>
                 <input type="text" id="configTitle" placeholder="Widget Title (optional)">

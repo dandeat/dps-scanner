@@ -550,6 +550,7 @@ type OdooConfig struct {
 
 // DataRequest defines the structure for incoming API requests from the frontend.
 type DataRequest struct {
+	Type   string          `json:"type"` // NEW: Type of request, e.g., "search_count" or "search_read"
 	Model  string          `json:"model"`
 	Fields []string        `json:"fields"`
 	Domain [][]interface{} `json:"domain"` // NEW: Field for Odoo domain filter
@@ -743,6 +744,10 @@ func main() {
 			return
 		}
 
+		if req.Type == "number" {
+			req.Limit = 9999999
+		}
+
 		// Fetch data and count
 		response, err := odooConfig.fetchDataAndCount(sessionCookie, req.Model, req.Fields, req.Domain, req.Limit)
 		if err != nil {
@@ -753,7 +758,7 @@ func main() {
 	})
 
 	r.GET("/api/load_layout", func(c *gin.Context) {
-		data, err := os.ReadFile("./layout.json")
+		data, err := os.ReadFile("/app/layout.json")
 		if err != nil {
 			if os.IsNotExist(err) {
 				c.JSON(http.StatusOK, []map[string]interface{}{}) // Return empty layout if file does not exist

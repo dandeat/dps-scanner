@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return {
                 x: node.x, y: node.y, w: node.w, h: node.h,
                 id: config.id,
+                type: config.type || 'table', // Default to 'table' if not specified
                 title: config ? config.title : config.model,
                 model: config ? config.model : '',
                 fields: config ? config.fields : [],
@@ -136,6 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const id = widgetData.id || 'widget-' + Date.now();
         widgetConfigs.set(id, {
             id: id,
+            type: widgetData.type || 'table', // Default to 'table' if not specified
             title: widgetData.title,
             model: widgetData.model,
             fields: widgetData.fields,
@@ -205,28 +207,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!records) throw new Error("No records found in the response.");
 
                 const displayTitle = config.title || config.model;
+
                 let headerHTML = `<div class="widget-header">
-                                  <h4 class="widget-title" contenteditable="true" data-widget-id="${widgetId}">${displayTitle}</h4>
-                                  <span class="record-count">(${records.length} of ${totalCount})</span>
-                                  <div class="widget-actions">
-                                      <ion-icon name="settings-outline" class="config-icon" data-widget-id="${widgetId}"></ion-icon>
-                                      <ion-icon name="refresh-outline" class="refresh-icon" data-widget-id="${widgetId}"></ion-icon>
-                                  </div>
-                              </div>`;
-                let tableHTML = '<div class="table-container"><table><thead><tr>';
-                config.fields.forEach(field => tableHTML += `<th>${(field.charAt(0).toUpperCase() + field.slice(1)).replace(/_/g, ' ')}</th>`);
-                tableHTML += '</tr></thead><tbody>';
-                records.forEach(item => {
-                    tableHTML += '<tr>';
-                    config.fields.forEach(field => {
-                        let value = item[field];
-                        if (Array.isArray(value) && value.length > 0) value = value[1];
-                        else if (value === false || value === null || value === undefined) value = '–';
-                        tableHTML += `<td>${value}</td>`;
+                              <h4 class="widget-title" contenteditable="true" data-widget-id="${widgetId}">${displayTitle}</h4>
+                              <span class="record-count">(${records.length} of ${totalCount})</span>
+                              <div class="widget-actions">
+                                  <ion-icon name="settings-outline" class="config-icon" data-widget-id="${widgetId}"></ion-icon>
+                                  <ion-icon name="refresh-outline" class="refresh-icon" data-widget-id="${widgetId}"></ion-icon>
+                              </div>
+                          </div>`;
+                let tableHTML = '';
+                if (config.type === 'number') {
+                    tableHTML += `<div class="kpi-container"><div class="kpi-number">${data.total_count}</div></div>`;
+                } else {
+                    tableHTML += '<div class="table-container"><table><thead><tr>';
+                    config.fields.forEach(field => tableHTML += `<th>${(field.charAt(0).toUpperCase() + field.slice(1)).replace(/_/g, ' ')}</th>`);
+                    tableHTML += '</tr></thead><tbody>';
+                    records.forEach(item => {
+                        tableHTML += '<tr>';
+                        config.fields.forEach(field => {
+                            let value = item[field];
+                            if (Array.isArray(value) && value.length > 0) value = value[1];
+                            else if (value === false || value === null || value === undefined) value = '–';
+                            tableHTML += `<td>${value}</td>`;
+                        });
+                        tableHTML += '</tr>';
                     });
-                    tableHTML += '</tr>';
-                });
-                tableHTML += '</tbody></table></div>';
+                    tableHTML += '</tbody></table></div>';
+                }
                 if (contentInnerEl) {
                     contentInnerEl.innerHTML = headerHTML + tableHTML;
                     contentInnerEl.classList.remove('loading');
@@ -250,6 +258,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function openConfigModal(widgetId) {
         const config = widgetConfigs.get(widgetId);
         if (!config) return;
+        document.getElementById('configType').value = config.type || 'table'; // Default to 'table' if not specified
         document.getElementById('configWidgetId').value = widgetId;
         document.getElementById('configTitle').value = config.title;
         document.getElementById('configModel').value = config.model;
@@ -270,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             const domain = JSON.parse(document.getElementById('configDomain').value);
+            config.type = document.getElementById('configType').value || 'table'; // Default to 'table' if not specified
             config.title = document.getElementById('configTitle').value;
             config.model = document.getElementById('configModel').value;
             config.fields = document.getElementById('configFields').value.split(',').map(f => f.trim()).filter(f => f);
@@ -321,6 +331,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Event Listeners ---
     document.getElementById('fetchButton').addEventListener('click', () => {
+        const type = document.getElementById('widgetTypeInput').value;
         const title = document.getElementById('titleInput').value;
         const model = document.getElementById('modelInput').value;
         const fields = document.getElementById('fieldsInput').value.split(',').map(f => f.trim()).filter(f => f);
@@ -340,11 +351,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        createWidget({ title, model, fields, domain, limit }, true);
+        createWidget({ type, title, model, fields, domain, limit }, true);
         closeAddWidgetModal();
         saveLayout();
     });
     document.getElementById('duplicateConfigBtn').addEventListener('click', () => {
+        const type = document.getElementById('configType').value;
         const title = document.getElementById('configTitle').value;
         const model = document.getElementById('configModel').value;
         const fields = document.getElementById('configFields').value.split(',').map(f => f.trim()).filter(f => f);
@@ -364,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        createWidget({ title, model, fields, domain, limit }, true);
+        createWidget({ type, title, model, fields, domain, limit }, true);
         saveLayout();
         closeConfigModal();
     });
