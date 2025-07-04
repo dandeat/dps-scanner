@@ -779,7 +779,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read request body", "details": err.Error()})
 			return
 		}
-		if err := os.WriteFile("./layout.json", body, 0644); err != nil {
+		if err := os.WriteFile("/app/layout.json", body, 0644); err != nil {
 			log.Println("Error saving layout file:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save layout file", "details": err.Error()})
 			return
