@@ -1,17 +1,1 @@
-[
-  {
-    "x": 0,
-    "y": 0,
-    "w": 5,
-    "h": 5,
-    "id": "widget-1751538584628",
-    "title": "Shipment Belum Keluar",
-    "model": "dps.kemasan.tps",
-    "fields": ["pjt", "name", "waktu_gatein", "status_akhir", "durasi"],
-    "domain": [
-      ["pjt", "ilike", "Transmarine"],
-      ["waktu_gateout", "=", false]
-    ],
-    "limit": 20
-  }
-]
+[{"x":0,"y":0,"w":12,"h":3,"id":"widget-1753348050018","type":"table","title":"Kemasan Belum SPPB","model":"dps.kemasan","fields":["name","kode_agen","status_akhir","durasi"],"domain":[["no_sppb","=",false],["waktu_gateout","=",false]],"limit":15,"sort":"waktu_gatein asc"},{"x":0,"y":3,"w":12,"h":5,"id":"widget-1753348393594","type":"table","title":"Kemasan Sudah SPPB Belum Keluar","model":"dps.kemasan","fields":["name","kode_agen","status_akhir","durasi"],"domain":[["waktu_gateout","=",false],["no_sppb","!=",false]],"limit":15,"sort":"waktu_gatein asc"},{"x":0,"y":10,"w":12,"h":3,"id":"widget-1753793562943","type":"table","title":"Kemasan Per Lokasi","model":"x_bi_sql_view.x_view_per_lokasi","fields":["x_shipment","x_lokasi","x_jumlah"],"domain":[],"limit":15,"sort":""},{"x":0,"y":13,"w":6,"h":5,"id":"widget-1753697693050","type":"number","title":"Kemasan Sudah SPPB Belum Keluar","model":"dps.kemasan","fields":["name","kode_agen","status_akhir"],"domain":[["waktu_gateout","=",false],["no_sppb","!=",false]],"limit":15,"sort":""},{"x":6,"y":13,"w":6,"h":5,"id":"widget-1753697632971","type":"number","title":"Kemasan Belum SPPB","model":"dps.kemasan","fields":["name","kode_agen","status_akhir"],"domain":[["no_sppb","=",false],["waktu_gateout","=",false]],"limit":15,"sort":""}]

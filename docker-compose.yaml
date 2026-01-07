@@ -1,9 +1,9 @@
 version: '3'
 services:
-  dps-scanner:
+  dps-scanner-maj:
     image: ${REGISTRY_URL}/${APP_NAME}:${APP_VERSION}
     build: "./"
-    container_name: dps-scanner-${APP_VERSION}
+    container_name: dps-scanner-maj
     restart: unless-stopped
     tty: true
     environment:
@@ -11,9 +11,10 @@ services:
 
     volumes:
       - ./layout.json:/app/layout.json
+      - ./static:/static
 
     ports:
-      - "10122:8080"
+      - "10124:8080"
     logging:
       driver: "json-file"
       options:

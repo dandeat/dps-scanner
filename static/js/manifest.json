@@ -1,0 +1,22 @@
+{
+  "name": "Scan Monitor",
+  "short_name": "Scanner",
+  "scope": "/ui/",
+  "start_url": "/ui/",
+  "display": "standalone",
+  "background_color": "#1e1e1e",
+  "theme_color": "#1e1e1e",
+  "description": "A barcode scanning application for monitoring.",
+  "icons": [
+    {
+      "src": "../assets/icon-scanner.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "../assets/icon-scanner.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

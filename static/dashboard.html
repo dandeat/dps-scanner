@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Odoo Dashboard</title>
 
+    <meta http-equiv="refresh" content="600">
+
     <link href="https://cdn.jsdelivr.net/npm/gridstack@latest/dist/gridstack.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/ui/css/style.css">
 
@@ -85,11 +87,11 @@
             </div>
             <div class="form-group">
                 <label for="modelInput">Odoo Model</label>
-                <input type="text" id="modelInput" placeholder="e.g., res.partner">
+                <input type="text" id="modelInput" placeholder="e.g., res.partner" required>
             </div>
             <div class="form-group">
                 <label for="fieldsInput">Fields</label>
-                <input type="text" id="fieldsInput" placeholder="e.g., name,email">
+                <input type="text" id="fieldsInput" placeholder="e.g., name,email" required>
             </div>
             <div class="form-group">
                 <label for="domainInput">Domain Filter</label>
@@ -98,6 +100,10 @@
             <div class="form-group">
                 <label for="limitInput">Limit</label>
                 <input type="number" id="limitInput" placeholder="Default 15" min="1">
+            </div>
+            <div class="form-group">
+                <label for="sortInput">Sort (Optional)</label>
+                <input type="text" id="sortInput" placeholder="e.g., name asc, email desc">
             </div>
             <div class="modal-actions">
                 <button id="fetchButton" class="btn-primary">Add Widget</button>
@@ -125,11 +131,11 @@
             </div>
             <div class="form-group">
                 <label for="configModel">Odoo Model</label>
-                <input type="text" id="configModel" placeholder="e.g., res.partner">
+                <input type="text" id="configModel" placeholder="e.g., res.partner" required>
             </div>
             <div class="form-group">
                 <label for="configFields">Fields</label>
-                <input type="text" id="configFields" placeholder="e.g., name,email">
+                <input type="text" id="configFields" placeholder="e.g., name,email" required>
             </div>
             <div class="form-group">
                 <label for="configDomain">Domain Filter</label>
@@ -138,6 +144,10 @@
             <div class="form-group">
                 <label for="configLimit">Limit</label>
                 <input type="number" id="configLimit" placeholder="Default 15" value="15" min="1">
+            </div>
+            <div class="form-group">
+                <label for="configSort">Sort (Optional)</label>
+                <input type="text" id="configSort" placeholder="e.g., name asc, email desc">
             </div>
             <div class="modal-actions">
                 <button id="saveConfigBtn" class="btn-primary">Save Changes</button>

@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Monitor</title>
+    <!-- Barcode Scanning Library -->
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <script src="https://unpkg.com/@zxing/browser@latest/umd/zxing-browser.min.js"></script>
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=YfaIuqy2"></script>
+    <link rel="manifest" href="./js/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./js/sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            overflow-x: hidden;
+            /* Prevent horizontal scroll */
+        }
+
+        .centered {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 10px;
+            padding: 10px;
+        }
+
+        input,
+        select,
+        button {
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            width: 100%;
+            max-width: 350px;
+        }
+
+        button {
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .layout {
+            display: none;
+            flex-direction: row;
+            height: 100vh;
+            width: 100%;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .left {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .actions-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .actions-container button {
+            flex-grow: 1;
+        }
+
+        #currentFilter {
+            background-color: #2c3e50;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            text-align: center;
+            flex-grow: 2;
+        }
+
+        .barcode-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            color: #ffd700;
+            word-break: break-word;
+        }
+
+        .details-box {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            white-space: pre-wrap;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            min-height: 300px;
+        }
+
+        .status-approved {
+            background-color: #228B22 !important;
+            color: #fff;
+        }
+
+        .status-kuning {
+            background-color: #c4d202 !important;
+            color: #fff;
+        }
+
+        .status-rejected {
+            background-color: #8B0000 !important;
+            color: #fff;
+        }
+
+        .right {
+            flex: 1;
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .right h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .history-item {
+            background-color: #3c3c3c;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+
+        .recent-scan {
+            background-color: #ffd700 !important;
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+        }
+
+        /* --- MODAL STYLES --- */
+        .modal {
+            display: none;
+            /* Hidden by default */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.6);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #2a2a2a;
+            padding: 25px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 450px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            color: #f0f0f0;
+        }
+
+        .modal-content select,
+        .modal-content input,
+        .modal-content button {
+            width: 100%;
+        }
+
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: #fff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        #cameraFeed {
+            width: 100%;
+            border-radius: 5px;
+            background-color: #000;
+        }
+
+        /* --- RESPONSIVE STYLES --- */
+        @media (max-width: 768px) {
+            .layout {
+                flex-direction: column;
+                /* Stack left and right sections */
+                height: auto;
+                /* Allow content to determine height */
+                padding: 10px;
+                gap: 15px;
+            }
+
+            .left,
+            .right {
+                flex: none;
+                /* Reset flex sizing */
+                width: 100%;
+            }
+
+            .right {
+                max-height: 40vh;
+                /* Give history a max height */
+            }
+
+            .actions-container {
+                flex-direction: column;
+                /* Stack buttons vertically */
+                align-items: stretch;
+                /* Make buttons full width */
+            }
+
+            .barcode-display {
+                font-size: 1.5rem;
+                /* Smaller font for barcode on mobile */
+                padding: 15px;
+                text-align: center;
+            }
+
+            .details-box {
+                font-size: 0.95rem;
+                min-height: 200px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="centered" id="setup">
+        <h2>Masukkan Session ID</h2>
+        <input type="text" id="sessionInput" placeholder="Contoh: session123">
+        <button id="loadMuatListBtn">Lanjut</button>
+        <button id="openDashboardBtn">Buka Dashboard</button>
+
+        <div id="muatSelection"
+            style="display:none; flex-direction: column; align-items: center; gap: 10px; margin-top: 20px; width: 100%;">
+            <h3>Pilih Muat:</h3>
+            <select id="muatDropdown"></select>
+            <button id="startMonitoringBtn">Mulai Scan</button>
+            <button id="addMuatBtn" style="background-color: #27ae60;">+ Tambah Muat</button>
+        </div>
+    </div>
+
+    <div class="layout" id="scanner">
+        <div class="left">
+            <div id="barcodeString" class="barcode-display">Silakan scan barcode...</div>
+            <div class="actions-container">
+                <button id="openManualScanBtn" style="background-color: #f39c12;">Scan Manual</button>
+                <button id="openCameraScannerBtn" style="background-color: #16a085;">Scan with Camera</button>
+                <button id="openFilterBtn" style="background-color: #8e44ad;">Filter</button>
+                <div id="currentFilter">Filter: Semua</div>
+            </div>
+            <div id="scanDetails" class="details-box">Menunggu data dari server...</div>
+        </div>
+        <div class="right">
+            <h3>Riwayat Scan</h3>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <!-- MANUAL SCAN MODAL -->
+    <div id="manualScanModal" class="modal">
+        <div class="modal-content">
+            <span id="closeManualScanModalBtn" class="close-button">&times;</span>
+            <h2>Masukkan Kode Kemasan Manual</h2>
+            <input type="text" id="manualScanInput" placeholder="Ketik kode di sini dan tekan Enter...">
+            <button id="submitManualScanBtn">Kirim</button>
+        </div>
+    </div>
+
+    <!-- FILTER MODAL -->
+    <div id="filterModal" class="modal">
+        <div class="modal-content">
+            <span id="closeFilterModalBtn" class="close-button">&times;</span>
+            <h2>Filter Kriteria Muat</h2>
+            <select id="kriteriaDropdown"></select>
+            <button id="saveFilterBtn">Simpan Filter</button>
+        </div>
+    </div>
+
+    <!-- CAMERA SCAN MODAL -->
+    <div id="cameraModal" class="modal">
+        <div class="modal-content">
+            <span id="closeCameraScannerBtn" class="close-button">&times;</span>
+            <h2>Scan Barcode with Camera</h2>
+            <video id="cameraFeed"></video>
+            <p style="text-align: center; color: #ccc;">Arahkan kamera ke barcode</p>
+        </div>
+    </div>
+
+
+    <script>
+        // Use the 'load' event to ensure all resources, including the ZXing library,
+        // are fully loaded before the script runs. This prevents race conditions.
+        window.addEventListener('load', () => {
+            // --- GLOBAL VARIABLES ---
+            let sessionId = "";
+            let muatId = "";
+            let buffer = "";
+            let lastKeyTime = Date.now();
+            let barcodeString = "";
+            let ws;
+            let kriteriaMuat = "Semua";
+            let codeReader = null; // Will be initialized when scanner opens
+            let cameraControls = null; // To hold the controls for stopping the camera
+            let filterDesc = "";
+            let kriteriaArray = {};
+
+            // --- DOM ELEMENTS ---
+            const sessionInput = document.getElementById('sessionInput');
+            const setupDiv = document.getElementById('setup');
+            const muatSelectionDiv = document.getElementById('muatSelection');
+            const muatDropdown = document.getElementById('muatDropdown');
+            const scannerDiv = document.getElementById('scanner');
+            const scanDetails = document.getElementById('scanDetails');
+            const barcodeStringDiv = document.getElementById('barcodeString');
+            const historyList = document.getElementById('historyList');
+
+            const manualScanModal = document.getElementById('manualScanModal');
+            const manualInput = document.getElementById('manualScanInput');
+            const filterModal = document.getElementById('filterModal');
+            const kriteriaDropdown = document.getElementById('kriteriaDropdown');
+            const currentFilterDisplay = document.getElementById('currentFilter');
+            const cameraModal = document.getElementById('cameraModal');
+            const cameraFeed = document.getElementById('cameraFeed');
+
+            // Buttons
+            const loadMuatListBtn = document.getElementById('loadMuatListBtn');
+            const openDashboardBtn = document.getElementById('openDashboardBtn');
+            const startMonitoringBtn = document.getElementById('startMonitoringBtn');
+            const addMuatBtn = document.getElementById('addMuatBtn');
+            const openManualScanBtn = document.getElementById('openManualScanBtn');
+            const openCameraScannerBtn = document.getElementById('openCameraScannerBtn');
+            const openFilterBtn = document.getElementById('openFilterBtn');
+            const closeManualScanModalBtn = document.getElementById('closeManualScanModalBtn');
+            const submitManualScanBtn = document.getElementById('submitManualScanBtn');
+            const closeFilterModalBtn = document.getElementById('closeFilterModalBtn');
+            const saveFilterBtn = document.getElementById('saveFilterBtn');
+            const closeCameraScannerBtn = document.getElementById('closeCameraScannerBtn');
+
+            // --- SETUP & INITIALIZATION ---
+            async function loadMuatList() {
+                sessionId = sessionInput.value.trim();
+                if (!sessionId) return alert("Session ID wajib diisi.");
+
+                sessionInput.disabled = true;
+                loadMuatListBtn.style.display = "none";
+
+                try {
+                    const res = await fetch("/muat-list");
+                    if (!res.ok) throw new Error('Failed to fetch muat list');
+                    const data = await res.json();
+
+                    muatDropdown.innerHTML = "";
+                    data.forEach(m => {
+                        const option = document.createElement("option");
+                        option.value = m.id;
+                        option.textContent = `${m.nopol} - ${m.driver} - ${m.tujuan}`;
+                        muatDropdown.appendChild(option);
+                    });
+
+                    muatSelectionDiv.style.display = "flex";
+                } catch (error) {
+                    console.error(error);
+                    alert("Gagal memuat daftar muat. Cek konsol untuk detail.");
+                    sessionInput.disabled = false;
+                    loadMuatListBtn.style.display = "block";
+                }
+            }
+
+            async function addMuat() {
+                const nopol = prompt("Masukkan No Pol:");
+                const driver = prompt("Masukkan Nama Driver:");
+                const tujuan = prompt("Masukkan Tujuan:");
+
+                if (!nopol || !driver || !tujuan) return alert("Semua field wajib diisi!");
+
+                try {
+                    const res = await fetch("/tambah-muat", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ nopol, driver, tujuan })
+                    });
+
+                    if (res.ok) {
+                        alert("Muat berhasil ditambahkan.");
+                        loadMuatList(); // Refresh the list
+                    } else {
+                        throw new Error('Server responded with an error.');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert("Gagal menambahkan muat.");
+                }
+            }
+
+            function startMonitoring() {
+                muatId = muatDropdown.value;
+                if (!muatId) return alert("Muat harus dipilih.");
+
+                setupDiv.style.display = "none";
+                scannerDiv.style.display = "flex";
+
+                connectWebSocket();
+            }
+
+            // --- WEBSOCKET & DATA HANDLING ---
+            function connectWebSocket() {
+                const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+                ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/${sessionId}`);
+
+                ws.onmessage = (event) => {
+                    try {
+                        const response = JSON.parse(event.data);
+                        updateUI(response);
+                    } catch (error) {
+                        console.error("Failed to parse WebSocket message:", error);
+                    }
+                };
+
+                ws.onopen = () => {
+                    console.log("WebSocket connection established.");
+                    speakIndonesian("Siap menerima scan");
+                };
+
+                ws.onclose = () => {
+                    console.log("WebSocket connection closed. Attempting to reconnect...");
+                    setTimeout(connectWebSocket, 5000); // Reconnect after 5 seconds
+                };
+
+                ws.onerror = (error) => {
+                    console.error("WebSocket error:", error);
+                };
+            }
+
+            function updateUI(response) {
+                const data = response.data || {};
+
+                scanDetails.classList.remove("status-approved", "status-kuning", "status-rejected");
+                let waktuGateout = "-";
+                let noKemasan = barcodeString;
+                if (data.barcode != undefined && data.barcode != null) {
+                    noKemasan = data.barcode;
+                    barcodeString = data.barcode;
+                }
+
+                if (data.status_scan === "approved") {
+                    scanDetails.classList.add("status-approved");
+                    waktuGateout = data.waktu_gate_out;
+                    noKemasan = data.no_kemasan;
+                } else if (data.status_scan === "kuning") {
+                    scanDetails.classList.add("status-kuning");
+                } else if (data.status_scan === "rejected") {
+                    scanDetails.classList.add("status-rejected");
+                }
+
+                barcodeStringDiv.textContent = noKemasan;
+
+                scanDetails.textContent = `
+📦 Status: ${data.status_scan?.toUpperCase() || "UNKNOWN"}
+📝 Deskripsi: ${data.status_desc || ""}
+🔢 Barcode: ${barcodeString || ""}
+📦 Kemasan: ${data.no_kemasan || "-"}
+📄 SPPB: ${data.no_sppb || ""} (${data.tgl_sppb || ""})
+🔍 Hasil Periksa: ${data.hasil_periksa || "-"}
+🚪 Gate In: ${data.waktu_gate_in || "-"}
+🚪 Gate Out: ${waktuGateout || "-"}
+📍 Provinsi: ${data.provinsi_penerima || ""}
+🏢 Agen: - `.trim();
+
+                updateHistory(noKemasan, data.status_scan);
+
+                let speakText = "";
+                if (data.status_scan === "approved") speakText = "Disetujui";
+                else if (data.status_scan === "kuning") speakText = `${data.status_desc || "Periksa"}`;
+                else if (data.status_scan === "rejected") speakText = `Ditolak. ${data.status_desc || ""}`;
+
+                if (speakText) speakIndonesian(speakText);
+            }
+
+            function updateHistory(noKemasan, status) {
+                // const prevRecent = historyList.querySelector(".recent-scan");
+                // if (prevRecent) prevRecent.classList.remove("recent-scan");
+
+                const historyItem = document.createElement("div");
+                historyItem.className = "history-item";
+                historyItem.textContent = noKemasan;
+
+                if (status) historyItem.classList.add(`status-${status}`);
+
+                historyList.prepend(historyItem);
+
+                // setTimeout(() => historyItem.classList.add("recent-scan"), 10);
+            }
+
+            // --- SCANNING LOGIC ---
+            function handlePhysicalScan(e) {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+                    return;
+                }
+
+                const now = Date.now();
+                if (now - lastKeyTime > 200) buffer = "";
+                lastKeyTime = now;
+
+                if (e.key === "Enter") {
+                    if (buffer) {
+                        let cleanBuffer = buffer.replace(/Shift|Control|Alt|Meta|CapsLock|Tab|Escape|Backspace|Delete|ArrowLeft|ArrowRight|ArrowUp|Down|PageUp|PageDown|Home|End|Insert|F[1-9]|F1[0-2]/g, "");
+                        cleanBuffer = cleanBuffer.replace(/\s/g, "").toUpperCase();
+                        if (cleanBuffer) sendScan(cleanBuffer);
+                        buffer = "";
+                    }
+                } else {
+                    if (e.key.length === 1) {
+                        buffer += e.key;
+                    }
+                }
+            }
+
+            function sendScan(barcode) {
+                if (!sessionId || !muatId) return;
+                fetch("/scan", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        muat_id: muatId,
+                        barcode: barcode,
+                        kriteria_muat: kriteriaMuat
+                    })
+                }).catch(error => console.error("Failed to send scan:", error));
+                barcodeString = barcode;
+            }
+
+            function speakIndonesian(text) {
+                // Check if the ResponsiveVoice library is loaded and ready.
+                if (typeof responsiveVoice !== 'undefined') {
+
+                    responsiveVoice.speak(text, "Indonesian Female");
+                } else {
+                    // Fallback if ResponsiveVoice is not loaded
+                    console.error("ResponsiveVoice library not loaded.");
+                }
+            }
+
+            // --- MANUAL SCAN MODAL ---
+            function openManualScanModal() {
+                manualScanModal.style.display = 'flex';
+                manualInput.focus();
+            }
+
+            function closeManualScanModal() {
+                manualScanModal.style.display = 'none';
+                manualInput.value = '';
+            }
+
+            function submitManualScan() {
+                const code = manualInput.value.trim().toUpperCase();
+                if (code) {
+                    sendScan(code);
+                    closeManualScanModal();
+                } else {
+                    alert("Kode kemasan tidak boleh kosong.");
+                }
+            }
+
+            // --- FILTER MODAL ---
+            async function fetchKriteriaMuat() {
+                console.log("Fetching kriteria muat from API...");
+                const res = await fetch("/kriteria-list");
+                if (!res.ok) {
+                    throw new Error('Failed to fetch kriteria list');
+                }
+                return await res.json();
+            }
+
+            async function openFilterModal() {
+                filterModal.style.display = 'flex';
+                kriteriaDropdown.innerHTML = '<option>Memuat...</option>';
+                try {
+                    const kriteriaList = await fetchKriteriaMuat();
+                    kriteriaDropdown.innerHTML = '';
+                    kriteriaList.forEach(k => {
+                        const option = document.createElement('option');
+                        option.value = k.id;
+                        option.textContent = '[' + k.name + '] ' + k.uraian;
+                        kriteriaArray[k.id] = k.uraian;
+                        if (k === kriteriaMuat) {
+                            option.selected = true;
+                        }
+                        kriteriaDropdown.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error("Failed to fetch kriteria:", error);
+                    kriteriaDropdown.innerHTML = '<option>Gagal memuat</option>';
+                }
+            }
+
+            function closeFilterModal() {
+                filterModal.style.display = 'none';
+            }
+
+            function saveFilter() {
+                kriteriaMuat = kriteriaDropdown.value;
+                currentFilterDisplay.textContent = `Filter: ${kriteriaArray[kriteriaMuat]}`;
+                alert(`Filter diubah menjadi: ${kriteriaArray[kriteriaMuat]}`);
+                speakIndonesian("Filter diubah menjadi " + kriteriaArray[kriteriaMuat]);
+                closeFilterModal();
+            }
+
+            // --- CAMERA SCANNER ---
+            async function openCameraScanner() {
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.QR_CODE,
+                    ZXing.BarcodeFormat.CODE_128,
+                    ZXing.BarcodeFormat.CODE_39,
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.EAN_8,
+                    ZXing.BarcodeFormat.UPC_A,
+                    ZXing.BarcodeFormat.UPC_E,
+                    ZXing.BarcodeFormat.ITF,
+                ]);
+                const codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+                cameraModal.style.display = 'flex';
+                try {
+                    // Correctly call the static method on the class to list devices
+                    const videoInputDevices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+                    if (videoInputDevices.length === 0) {
+                        alert("No camera found.");
+                        closeCameraScanner();
+                        return;
+                    }
+
+                    console.log("Available video input devices:", videoInputDevices);
+                    const selectedDeviceId = videoInputDevices[videoInputDevices.length - 1].deviceId;
+                    console.log(`Starting scan with camera ID: ${selectedDeviceId}`);
+
+                    // Start decoding. The controls are returned in the callback.
+                    const controlRes = await codeReader.decodeFromVideoDevice(selectedDeviceId, cameraFeed, (result, err, control) => {
+                        // Store controls so they can be accessed to stop the scanner
+                        // cameraControls = controls;
+
+                        if (result) {
+                            console.log("Barcode found:", result.text);
+                            playBeep(); // Play beep sound on successful scan
+                            sendScan(result.text);
+
+                            // set delay after scan 1 second and then continue scanning
+                            setTimeout(() => {
+
+                            }, 1000);
+                        }
+                        if (err && !(err instanceof ZXing.NotFoundException)) {
+                            console.error("Camera scan error:", err);
+                            playBeep(); // Play beep sound on error
+                            codeReader.reset(); // Stop the camera stream
+                            closeCameraScanner();
+                            return;
+                        }
+                    });
+
+                } catch (err) {
+                    console.error("Error initializing camera:", err);
+                    alert("Tidak dapat mengakses kamera. Pastikan Anda memberikan izin.");
+                    closeCameraScanner();
+                }
+
+                // setTimeout(() => cameraControls.stop(), 20000);
+            }
+
+            function closeCameraScanner() {
+                cameraModal.style.display = 'none';
+            }
+
+            // --- EVENT LISTENERS ---
+            loadMuatListBtn.addEventListener('click', loadMuatList);
+            openDashboardBtn.addEventListener('click', () => {
+                window.location.href = '/ui/dashboard.html';
+            });
+            startMonitoringBtn.addEventListener('click', startMonitoring);
+            addMuatBtn.addEventListener('click', addMuat);
+
+            openManualScanBtn.addEventListener('click', openManualScanModal);
+            openCameraScannerBtn.addEventListener('click', openCameraScanner);
+            openFilterBtn.addEventListener('click', openFilterModal);
+
+            closeManualScanModalBtn.addEventListener('click', closeManualScanModal);
+            submitManualScanBtn.addEventListener('click', submitManualScan);
+            manualInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitManualScan();
+                }
+            });
+
+            closeFilterModalBtn.addEventListener('click', closeFilterModal);
+            saveFilterBtn.addEventListener('click', saveFilter);
+
+            closeCameraScannerBtn.addEventListener('click', closeCameraScanner);
+
+            document.addEventListener("keydown", handlePhysicalScan);
+
+            window.onclick = function (event) {
+                if (event.target == manualScanModal) closeManualScanModal();
+                if (event.target == filterModal) closeFilterModal();
+                if (event.target == cameraModal) closeCameraScanner();
+            }
+
+            function playBeep() {
+                // Create an AudioContext
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // Create an Oscillator node
+                const oscillator = audioContext.createOscillator();
+
+                // Create a Gain node to control the volume
+                const gainNode = audioContext.createGain();
+
+                // Connect the oscillator to the gain node, and the gain node to the output (speakers)
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // --- Configure the beep sound ---
+                oscillator.type = 'sine'; // Type of sound wave (sine, square, sawtooth, triangle)
+                oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // Frequency in hertz (A4 note)
+                gainNode.gain.setValueAtTime(1, audioContext.currentTime); // Volume (0 to 1)
+
+                // Start the sound now
+                oscillator.start(audioContext.currentTime);
+
+                // Stop the sound after a short duration (e.g., 0.2 seconds)
+                oscillator.stop(audioContext.currentTime + 0.2);
+            }
+
+        });
+    </script>
+</body>
+
+</html>

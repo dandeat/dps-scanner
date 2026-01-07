@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Grid and Widget Functions ---
     function initGrid() {
         grid = GridStack.init({
-            float: true, cellHeight: 'auto', margin: 10, minRow: 1, acceptWidgets: true, removable: '#trash',
+            float: true, cellHeight: 'auto', margin: 10, minRow: 1, column: 12, acceptWidgets: true, removable: '#trash',
         });
         grid.on('change removed', () => saveLayout());
         grid.on('removed', (event, items) => {
@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 fields: config ? config.fields : [],
                 domain: config ? config.domain : [],
                 limit: config ? config.limit : 15,
+                sort: config ? config.sort : '',
             };
         });
         fetch('/api/save_layout', {
@@ -143,6 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
             fields: widgetData.fields,
             domain: widgetData.domain,
             limit: widgetData.limit || 15,
+            sort: widgetData.sort || '',
         });
 
         console.log('Creating widget:', id, widgetData);
@@ -191,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('/api/odoo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: config.model, fields: config.fields, domain: config.domain, limit: config.limit }),
+            body: JSON.stringify({ model: config.model, fields: config.fields, domain: config.domain, limit: config.limit, sort: config.sort }),
         })
             .then(response => {
                 console.log('Response status:', response.status);
@@ -210,8 +212,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 let headerHTML = `<div class="widget-header">
                               <h4 class="widget-title" contenteditable="true" data-widget-id="${widgetId}">${displayTitle}</h4>
-                              <span class="record-count">(${records.length} of ${totalCount})</span>
-                              <div class="widget-actions">
+                              `
+                if (config.type === 'table') {
+                    headerHTML += `<span class="record-count">(${records.length} of ${totalCount})</span>`
+                }
+                headerHTML += `<div class="widget-actions">
                                   <ion-icon name="settings-outline" class="config-icon" data-widget-id="${widgetId}"></ion-icon>
                                   <ion-icon name="refresh-outline" class="refresh-icon" data-widget-id="${widgetId}"></ion-icon>
                               </div>
@@ -265,6 +270,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('configFields').value = config.fields.join(',');
         document.getElementById('configDomain').value = JSON.stringify(config.domain, null, 2);
         document.getElementById('configLimit').value = config.limit || 15;
+        document.getElementById('configSort').value = config.sort || '';
         configModal.style.display = 'flex';
     }
 
@@ -285,6 +291,12 @@ document.addEventListener('DOMContentLoaded', function () {
             config.fields = document.getElementById('configFields').value.split(',').map(f => f.trim()).filter(f => f);
             config.domain = domain;
             config.limit = parseInt(document.getElementById('configLimit').value, 10) || 15;
+            config.sort = document.getElementById('configSort').value;
+            if (!config.model || config.fields.length === 0) {
+                alert('Model and Fields are required to configure a widget.');
+                return;
+            }
+
 
             refreshWidgetData(widgetId);
             saveLayout();
@@ -337,6 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const fields = document.getElementById('fieldsInput').value.split(',').map(f => f.trim()).filter(f => f);
         const filterText = document.getElementById('domainInput').value;
         const limit = parseInt(document.getElementById('limitInput').value, 10) || 15;
+        const sort = document.getElementById('sortInput').value;
         let domain = [];
 
         if (!model || fields.length === 0) {
@@ -351,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        createWidget({ type, title, model, fields, domain, limit }, true);
+        createWidget({ type, title, model, fields, domain, limit, sort }, true);
         closeAddWidgetModal();
         saveLayout();
     });
@@ -362,6 +375,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const fields = document.getElementById('configFields').value.split(',').map(f => f.trim()).filter(f => f);
         const filterText = document.getElementById('configDomain').value;
         const limit = parseInt(document.getElementById('configLimit').value, 10) || 15;
+        const sort = document.getElementById('configSort').value;
         let domain = [];
 
         if (!model || fields.length === 0) {
@@ -376,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        createWidget({ type, title, model, fields, domain, limit }, true);
+        createWidget({ type, title, model, fields, domain, limit, sort }, true);
         saveLayout();
         closeConfigModal();
     });

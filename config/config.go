@@ -1,35 +1,48 @@
 package config
 
 import (
-	"log"
-	"os"
-
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
-var (
-	JWTKey    = GetEnv("JWT_KEY", "MKPMobile123@")
-	SECRETKey = GetEnv("SECRET_KEY", "qFpdW1A9udvi8PPh")
+// Config holds all configuration for the application.
+type Config struct {
+	ServerPort   string
+	OdooURL      string
+	OdooDB       string
+	OdooUsername string
+	OdooPassword string
+}
 
-	// Swicth Debug Mode
-	DebugMode = GetEnv("DEBUG_MODE", "true")
-)
+// Load reads configuration from a file and environment variables.
+func Load() (*Config, error) {
+	viper.SetConfigName("config") // name of config file (without extension)
+	viper.SetConfigType("yaml")   // or json, toml
+	viper.AddConfigPath(".")      // look for config in the working directory
+	viper.AutomaticEnv()          // read in environment variables that match
 
-func GetEnv(key string, value ...string) string {
-	if err := godotenv.Load(".env"); err != nil {
-		panic("Error Load file .env not found")
-	}
-
-	if os.Getenv(key) != "" {
-		log.Println("GetEnv: ", key, " = ", os.Getenv(key))
-		return os.Getenv(key)
-	} else {
-		if len(value) > 0 {
-			log.Println("GetEnv: Default ", key, " = ", value[0])
-			return value[0]
+	if err := viper.ReadInConfig(); err != nil {
+		// If the config file is not found, we can proceed
+		// as long as environment variables are set.
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, err
 		}
-
-		log.Println("GetEnv: Not Found ", key)
-		return ""
 	}
+
+	// Set default values
+	viper.SetDefault("SERVER_PORT", "8080")
+	viper.SetDefault("ODOO_URL", "https://maj.oneerp.app")
+	viper.SetDefault("ODOO_DB", "maj_cn")
+	viper.SetDefault("ODOO_USERNAME", "system")
+	viper.SetDefault("ODOO_PASSWORD", "admindps.1.2.3@#@")
+
+
+	cfg := &Config{
+		ServerPort:   viper.GetString("SERVER_PORT"),
+		OdooURL:      viper.GetString("ODOO_URL"),
+		OdooDB:       viper.GetString("ODOO_DB"),
+		OdooUsername: viper.GetString("ODOO_USERNAME"),
+		OdooPassword: viper.GetString("ODOO_PASSWORD"),
+	}
+
+	return cfg, nil
 }
